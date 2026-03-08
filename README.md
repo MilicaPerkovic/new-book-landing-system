@@ -71,6 +71,9 @@ Komponente sistema komunicirajo prek REST API-jev z JSON formatom. Za asinhrono 
 - Statistika konverzij (ogledi → naročila)
 - Analitika uporabniških dejanj
 - Generiranje poročil
+- število obiskov landing page
+- število klikov na "Prednaroči"
+- konverzijo (views → orders)
 
 ---
 
@@ -113,6 +116,13 @@ Komponente sistema komunicirajo prek REST API-jev z JSON formatom. Za asinhrono 
               └───────────────────┘
 ```
 
+**Diagram**
+ - Frontend je del uporabniskega vmesnika. Ne komunicira direktno s storitvijo, ampak s pomocjo https/rest
+ - Api Gateway je vstopna tocka v sistem. Njegove naloge so: sprejem zahtev iz frontenda, preveri avtentikacijo, preusmeri zahtevo na mikrostoritev 
+ - Mikrostoritev, vsaka je neodvisno in ima tocno doloceno odgovornost
+ - DB : vsaka mikrostoritev ima svojo bazo podatkov, vsaka vpravlja svoje podakte
+ - RabbitMQ omogoca asinhrono komunikacijo, storitev poslje dogodek in ga druge poslusaju
+
 ### Ključne Arhitekturne Odločitve
 
 **Komunikacija:**
@@ -138,6 +148,14 @@ Order service ustvari narocilo v bazi
 Nato poslje dogodek v RabbitMQ order.placed
 Notification service poslusa dogodek in ko sprejme sporocilo poslje uporabniku email 
 Tako order service ne caka da se email poslje  
+
+- **Api gateway**
+- API Gateway je vstopna točka v sistem.
+Njegove naloge so:
+usmerjanje zahtev do mikrostoritev
+avtentikacija uporabnikov
+omejevanje zahtev (rate limiting)
+skrivanje notranje arhitekture sistema
 
 
 **Baze Podatkov:**
@@ -466,51 +484,53 @@ docker-compose -f docker-compose.prod.yml up -d
 ## Scenariji 
 
 1. Avtor ali zaloznik se prijavi v sistem
-2. Pritisne gumb za ustvarjanje nove knjige 
+2. Pritisne gumb za ustvarjanje nove knjige, "Create book"
 3. Izpolni ime, naslov, opis, avtor, cena, isbn
-4. Shrani 
-5. Book service validira in potrdi podatke, ter shrani knjigo v database 
+4. Frontend poslje zahtevo POST /api/books
+5. API Gateway zahtevo preusmeri na Book Service.
+6. Book service preveri podatke in shrani jo v Book DB
+7. Sistem vrne odgovor frontendu 
+8. Frontend prikaze novo ustvarjeno knjigo 
 
-- Knjiga je shranjena, ampak se ni javno objavljena 
 
 ## Scenarij 2 
 
 Avtor ustvari landing page 
 1. Avtor izbere obstojeco knjigo 
-2. Klikne gumb za ustvarjanje landing page-a 
-3. Pritisne gumb za objavljanje 
-4. Landing page service poveze page z bookId in generira javni url 
-5. Javna stran je pripravljena 
+2. Klikne gumb za ustvarjanje landing page-a, "Create landing page"
+3. Frontend poslje zahtevo POST /api/landing-pages
+4. API Gateway zahtevo preusmeri na Landing Page Service
+5. Landing page service shrani konfiguracijo strani in poveze bookID
+6. Avtor klikne "Publish"
+7. Sistem generira javni URL /landing/new-fantasy-novel
 
 
 ## Scenarij 3 
 Bralec obisce stran 
 
-1. Bralec klikne link 
+1. Bralec odrpe URL strani
 2. Frontend poslje get api/landing-pages/id
 3. Landing service vrne bookId in stran 
-4. Front end poklice get /api/books/id
+4. Frontend poslje zahtevo get /api/books/id
 5. Book service vrne podatke o knjigi 
+6. Frontend prikaze stran
 
 
 ## Scenarij 4 
 Bralec odda narocilo 
 1. Klikne gumb "Naroci"
 2. Izpolni ime, email in naslov 
-3. Frontend poslje gpostet /api/orders
-4. Order service preveri ali knjiga obstaja 
-ustvari narocilo 
-5. narocilo je shrajneno in prikazano bralcu 
+3. Frontend poslje post /api/orders
+4. Order service preveri ali knjiga obstaja in shrani narocilo v OrdersDB
+5. Order Service objavi event: order.placed v RabbitMQ
+6. Notification Service prejme event in pošlje email.
 
 ## scenarij 5 
 Avtor pregleda statistiko 
 1. Avtor odpre dashboard 
 2. Frontend poslje  get /api/orders/book/id
-3. order service vrne stevilo narocil 
-4. Prikaz osnovne statistike 
-
-
-## Ko avtor naredi knjigo, BOOK SERVICE skrbi samo za knjige in podatke o knjigah. 
-## Avtor potem naredi landing page - LANDING PAGE SERVICE 
+3. order service vrne stevilo narocil ali statuse narocil
+4. Frontednd prikaz osnovne statistike 
+ 
 
 
