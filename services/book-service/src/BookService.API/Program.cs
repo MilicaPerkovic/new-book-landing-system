@@ -1,5 +1,8 @@
 using Serilog;
 using Serilog.Formatting.Compact;
+using BookService.Infrastructure.Extensions;
+using BookService.Domain.Services;
+using BookService.Domain.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -64,17 +67,17 @@ try
     // ============================================================
     // 3. BUSINESS LOGIC LAYER
     // ============================================================
-    // TODO: In Phase 2, we will register BookService here
-    // builder.Services.AddScoped<IBookService, BookService>();
-    // builder.Services.AddScoped<IBookRepository, BookRepository>();
+    // Register BookService (business logic)
+    builder.Services.AddScoped<BookService>();
 
     // ============================================================
-    // 4. DATABASE SETUP
+    // 4. INFRASTRUCTURE LAYER (Phase 1C)
     // ============================================================
-    // TODO: In Phase 2, we will add Entity Framework Core here
-    // builder.Services.AddDbContext<BookServiceDbContext>(options =>
-    //     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
-    // );
+    // Register all infrastructure services:
+    // - DbContext (Entity Framework Core)
+    // - IBookRepository → BookRepository (PostgreSQL implementation)
+    // - Database migration support
+    builder.Services.AddInfrastructure(builder.Configuration);
 
     // Build the application
     var app = builder.Build();
@@ -109,6 +112,26 @@ try
 
     // Map controllers (finds all controller classes and routes)
     app.MapControllers();
+
+    // ============================================================
+    // 6. DATABASE INITIALIZATION
+    // ============================================================
+    // Apply migrations and initialize database
+    // This runs ONCE at startup:
+    // 1. Creates database if not exists
+    // 2. Applies pending migrations
+    // 3. Runs any seeding code
+    try
+    {
+        Log.Information("Initializing database...");
+        await app.Services.InitializeDatabaseAsync();
+        Log.Information("Database initialized successfully");
+    }
+    catch (Exception ex)
+    {
+        Log.Fatal(ex, "Failed to initialize database");
+        throw;
+    }
 
     Log.Information("Book Service started successfully");
     await app.RunAsync();
