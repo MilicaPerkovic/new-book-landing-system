@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- Target Framework - We're using .NET 8 (latest stable LTS) -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <OutputType>Exe</OutputType>
+    <UserSecretsId>bookservice-secrets</UserSecretsId>
+  </PropertyGroup>
+
+  <!-- Package Dependencies -->
+  <!-- These are libraries that our project needs to run -->
+  <ItemGroup>
+    <!-- Entity Framework Core - Database ORM (Object-Relational Mapping) -->
+    <!-- Allows us to work with databases using C# objects instead of SQL -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.0" />
+    
+    <!-- PostgreSQL provider for Entity Framework -->
+    <!-- Enables communication with PostgreSQL database -->
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.0" />
+
+    <!-- Serilog - Advanced logging library -->
+    <!-- Structured logging = we can query and analyze logs easily -->
+    <PackageReference Include="Serilog" Version="3.1.1" />
+    <PackageReference Include="Serilog.AspNetCore" Version="8.0.1" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="5.0.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
+    <!-- Serilog JSON for structured logging output -->
+    <PackageReference Include="Serilog.Formatting.Compact" Version="3.0.0" />
+
+    <!-- Swagger/OpenAPI - Auto-documented API -->
+    <!-- Generates interactive API documentation at /swagger -->
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
+
+    <!-- FluentValidation - Input validation library -->
+    <!-- Makes it easy to validate user input (e.g., book title not empty) -->
+    <PackageReference Include="FluentValidation.AspNetCore" Version="11.3.0" />
+  </ItemGroup>
+
+  <!-- References to other projects in our solution -->
+  <ItemGroup>
+    <ProjectReference Include="..\BookService.Domain\BookService.Domain.csproj" />
+    <ProjectReference Include="..\BookService.Infrastructure\BookService.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>
