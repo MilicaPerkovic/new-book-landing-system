@@ -36,7 +36,10 @@ public class BooksControllerIntegrationTests : IAsyncLifetime
     public async Task DisposeAsync()
     {
         _client?.Dispose();
-        await (_factory?.DisposeAsync() ?? Task.CompletedTask);
+        if (_factory != null)
+        {
+            await _factory.DisposeAsync();
+        }
     }
 
     #region GET All Books Tests
@@ -65,7 +68,7 @@ public class BooksControllerIntegrationTests : IAsyncLifetime
         {
             Title = "Test Book",
             Author = "Test Author",
-            Isbn = "978-0-451-52494-2",
+            ISBN = "978-0-451-52494-2",
             Description = "This is a test description for a book",
             Price = 19.99m,
             ImageUrl = "https://example.com/book.jpg"
@@ -90,7 +93,7 @@ public class BooksControllerIntegrationTests : IAsyncLifetime
         {
             Title = "Test Book",
             Author = "Test Author",
-            Isbn = "123", // Invalid: too short
+            ISBN = "123", // Invalid: too short
             Description = "This is a test description",
             Price = 19.99m
         };
@@ -110,7 +113,7 @@ public class BooksControllerIntegrationTests : IAsyncLifetime
         {
             Title = "", // Empty
             Author = "Test Author",
-            Isbn = "978-0-451-52494-2",
+            ISBN = "978-0-451-52494-2",
             Description = "Test description",
             Price = 19.99m
         };
@@ -130,7 +133,7 @@ public class BooksControllerIntegrationTests : IAsyncLifetime
         {
             Title = "Test Book",
             Author = "Test Author",
-            Isbn = "978-0-451-52494-2",
+            ISBN = "978-0-451-52494-2",
             Description = "Test description",
             Price = -10m // Negative
         };
@@ -150,7 +153,7 @@ public class BooksControllerIntegrationTests : IAsyncLifetime
         {
             Title = "Book 1",
             Author = "Author",
-            Isbn = "978-0-451-52494-3",
+            ISBN = "978-0-451-52494-3",
             Description = "First book",
             Price = 10m
         };
@@ -162,7 +165,7 @@ public class BooksControllerIntegrationTests : IAsyncLifetime
         {
             Title = "Book 2",
             Author = "Author",
-            Isbn = "978-0-451-52494-3", // Duplicate ISBN
+            ISBN = "978-0-451-52494-3", // Duplicate ISBN
             Description = "Second book",
             Price = 15m
         };
@@ -186,7 +189,7 @@ public class BooksControllerIntegrationTests : IAsyncLifetime
         {
             Title = "Findable Book",
             Author = "Author",
-            Isbn = "978-0-451-52494-4",
+            ISBN = "978-0-451-52494-4",
             Description = "A book to find",
             Price = 10m
         };
@@ -227,7 +230,7 @@ public class BooksControllerIntegrationTests : IAsyncLifetime
         {
             Title = "Original Title",
             Author = "Author",
-            Isbn = "978-0-451-52494-5",
+            ISBN = "978-0-451-52494-5",
             Description = "Original description",
             Price = 10m
         };
@@ -287,7 +290,7 @@ public class BooksControllerIntegrationTests : IAsyncLifetime
         {
             Title = "To Delete",
             Author = "Author",
-            Isbn = "978-0-451-52494-6",
+            ISBN = "978-0-451-52494-6",
             Description = "Will be deleted",
             Price = 10m
         };
@@ -329,7 +332,7 @@ public class BooksControllerIntegrationTests : IAsyncLifetime
         {
             Title = "Book to Publish",
             Author = "Author",
-            Isbn = "978-0-451-52494-7",
+            ISBN = "978-0-451-52494-7",
             Description = "About to be published",
             Price = 10m
         };
@@ -357,7 +360,7 @@ public class BooksControllerIntegrationTests : IAsyncLifetime
         {
             Title = "Book to Archive",
             Author = "Author",
-            Isbn = "978-0-451-52494-8",
+            ISBN = "978-0-451-52494-8",
             Description = "About to be archived",
             Price = 10m
         };
@@ -387,7 +390,7 @@ public class BooksControllerIntegrationTests : IAsyncLifetime
         {
             Title = "Book to Discontinue",
             Author = "Author",
-            Isbn = "978-0-451-52494-9",
+            ISBN = "978-0-451-52494-9",
             Description = "About to be discontinued",
             Price = 10m
         };
@@ -421,7 +424,7 @@ public class BooksControllerIntegrationTests : IAsyncLifetime
         {
             Title = "Published Book",
             Author = "Author",
-            Isbn = "978-0-451-52494-1",
+            ISBN = "978-0-451-52494-1",
             Description = "Already published",
             Price = 10m
         };
@@ -509,7 +512,7 @@ public class BooksControllerIntegrationTests : IAsyncLifetime
         {
             Title = "Complete Lifecycle Book",
             Author = "Author",
-            Isbn = "978-0-451-52494-0",
+            ISBN = "978-0-451-52494-0",
             Description = "Testing complete lifecycle",
             Price = 25m
         };
