@@ -1,0 +1,70 @@
+name: Book Service Tests
+
+on:
+  push:
+    branches: [ "**" ]
+    paths:
+      - 'services/book-service/**'
+      - '.github/workflows/book-service.yml'
+
+jobs:
+  test-book-service:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: bookservice_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore services/book-service/
+      working-directory: ${{ github.workspace }}
+
+    - name: Build
+      run: dotnet build --no-restore -c Release services/book-service/
+      working-directory: ${{ github.workspace }}
+
+    - name: Run Unit Tests
+      run: dotnet test tests/BookService.UnitTests --no-build -c Release --verbosity normal --logger "trx;LogFileName=unit-tests.trx"
+      working-directory: ${{ github.workspace }}/services/book-service
+
+    - name: Run Repository Tests
+      run: dotnet test tests/BookService.RepositoryTests --no-build -c Release --verbosity normal --logger "trx;LogFileName=repo-tests.trx"
+      working-directory: ${{ github.workspace }}/services/book-service
+      env:
+        ConnectionStrings__DefaultConnection: "Server=localhost;Port=5432;Database=bookservice_test;User Id=postgres;Password=postgres;"
+
+    - name: Run Integration Tests
+      run: dotnet test tests/BookService.IntegrationTests --no-build -c Release --verbosity normal --logger "trx;LogFileName=integration-tests.trx"
+      working-directory: ${{ github.workspace }}/services/book-service
+
+    - name: Collect Code Coverage
+      run: dotnet test services/book-service/ /p:CollectCoverage=true /p:CoverageFormat=opencover /p:CoverageDirectory=./coverage
+
+    - name: Publish Test Results
+      uses: EnricoMi/publish-unit-test-result-action@v2
+      if: always()
+      with:
+        files: |
+          services/book-service/tests/BookService.UnitTests/TestResults/unit-tests.trx
+          services/book-service/tests/BookService.RepositoryTests/TestResults/repo-tests.trx
+          services/book-service/tests/BookService.IntegrationTests/TestResults/integration-tests.trx
