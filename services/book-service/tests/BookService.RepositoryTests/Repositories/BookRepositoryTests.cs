@@ -92,7 +92,7 @@ public class BookRepositoryTests : IAsyncLifetime
         await _repository!.CreateAsync(book);
 
         // Assert: Book saved with ID
-        var savedBook = await _dbContext!.Books.FirstOrDefaultAsync(b => b.Isbn == "978-0-451-52494-2");
+        var savedBook = await _dbContext!.Books.FirstOrDefaultAsync(b => b.ISBN == "978-0-451-52494-2");
         Assert.NotNull(savedBook);
         Assert.NotEqual(Guid.Empty, savedBook.Id);
         Assert.Equal("1984", savedBook.Title);
