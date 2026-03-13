@@ -1,3 +1,5 @@
+using BookService.Domain.Enums;
+
 namespace BookService.Domain.Entities;
 
 /// <summary>

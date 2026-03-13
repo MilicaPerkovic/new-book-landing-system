@@ -1,3 +1,4 @@
+using System;
 using BookService.Domain.Interfaces;
 using BookService.Infrastructure.Data;
 using BookService.Infrastructure.Repositories;
@@ -75,17 +76,13 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddDbContext<BookServiceDbContext>(options =>
         {
             // UseNpgsql = use Npgsql provider (PostgreSQL driver)
-            // EnableSensitiveDataLogging = log actual values (development only!)
             options.UseNpgsql(connectionString, npgsqlOptions =>
             {
                 // Enable retry on transient failures (temporary database issues)
                 npgsqlOptions.EnableRetryOnFailure(
                     maxRetryCount: 3,
-                    maxRetryDelayMilliseconds: 1000,
+                    maxRetryDelay: TimeSpan.FromMilliseconds(1000),
                     errorCodesToAdd: null);
-
-                // Use UTC for all timestamps (database stores UTC)
-                npgsqlOptions.UseAdminDatabase("postgres");
             });
 
             // Log SQL queries (helpful for debugging)
@@ -98,12 +95,6 @@ public static class InfrastructureServiceCollectionExtensions
         // When code needs IBookRepository, inject BookRepository
         // Scoped = new instance per HTTP request
         services.AddScoped<IBookRepository, BookRepository>();
-
-        // ============================================================
-        // 3. Database Design-Time Services
-        // ============================================================
-        // Allows 'dotnet ef' commands to work
-        services.AddScoped<BookServiceDbContext>();
 
         return services;
     }
@@ -136,10 +127,11 @@ public static class InfrastructureServiceCollectionExtensions
 
         try
         {
-            // Apply any pending migrations
-            // This creates the database if it doesn't exist
-            // and applies all unapplied migrations
-            await dbContext.Database.MigrateAsync();
+            // EnsureCreatedAsync creates all tables from the current EF Core model
+            // if they do not already exist.  This is the right approach when there
+            // are no migration files in the project yet.  Once you add migrations
+            // (dotnet ef migrations add ...) you can switch back to MigrateAsync().
+            await dbContext.Database.EnsureCreatedAsync();
 
             Console.WriteLine("Database initialized successfully");
         }

@@ -28,11 +28,14 @@
     <PackageReference Include="Serilog.Sinks.Console" Version="5.0.1" />
     <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
     <!-- Serilog JSON for structured logging output -->
-    <PackageReference Include="Serilog.Formatting.Compact" Version="3.0.0" />
+    <PackageReference Include="Serilog.Formatting.Compact" Version="2.0.0" />
 
     <!-- Swagger/OpenAPI - Auto-documented API -->
     <!-- Generates interactive API documentation at /swagger -->
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
+    
+    <!-- For ProduceResponseType attribute -->
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.0" />
 
     <!-- FluentValidation - Input validation library -->
     <!-- Makes it easy to validate user input (e.g., book title not empty) -->

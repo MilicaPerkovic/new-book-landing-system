@@ -3,6 +3,10 @@ using Serilog.Formatting.Compact;
 using BookService.Infrastructure.Extensions;
 using BookService.Domain.Services;
 using BookService.Domain.Interfaces;
+using BookService.API.DTOs;
+using BookService.API.Validators;
+using BookService.API.Middleware;
+using FluentValidation;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,8 +18,6 @@ var builder = WebApplication.CreateBuilder(args);
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
     .Enrich.FromLogContext()
-    .Enrich.WithMachineName()
-    .Enrich.WithThreadId()
     .WriteTo.Console(new CompactJsonFormatter())
     .WriteTo.File(
         path: "logs/bookservice-.txt",
@@ -64,12 +66,14 @@ try
             });
     });
 
+    // FluentValidation - Input data validation
+    builder.Services.AddValidatorsFromAssemblyContaining<CreateBookRequestValidator>();
+
     // ============================================================
     // 3. BUSINESS LOGIC LAYER
     // ============================================================
     // Register BookService (business logic)
-    builder.Services.AddScoped<BookService>();
-
+builder.Services.AddScoped<BookService.Domain.Services.BookService>();
     // ============================================================
     // 4. INFRASTRUCTURE LAYER (Phase 1C)
     // ============================================================
@@ -87,6 +91,12 @@ try
     // ============================================================
     // Middleware is code that runs on EVERY incoming HTTP request
     // It processes the request and passes it down the pipeline
+
+    // ============================================================
+    // 5A. GLOBAL EXCEPTION MIDDLEWARE
+    // ============================================================
+    // Must be near the top to catch exceptions from other middleware
+    app.UseGlobalExceptionMiddleware();
 
     if (app.Environment.IsDevelopment())
     {
@@ -112,6 +122,9 @@ try
 
     // Map controllers (finds all controller classes and routes)
     app.MapControllers();
+
+        // Health check endpoint - used by Docker to verify the service is alive
+        app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "book-service" }));
 
     // ============================================================
     // 6. DATABASE INITIALIZATION

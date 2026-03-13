@@ -1,5 +1,7 @@
 using BookService.Domain.Entities;
 using BookService.Domain.Interfaces;
+using BookService.Domain.Enums;
+using BookService.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 

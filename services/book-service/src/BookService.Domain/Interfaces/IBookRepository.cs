@@ -1,5 +1,6 @@
 using BookService.Domain.Entities;
 using BookService.Domain.Common;
+using BookService.Domain.Enums;
 
 namespace BookService.Domain.Interfaces;
 

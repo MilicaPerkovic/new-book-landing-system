@@ -1,4 +1,5 @@
 using BookService.Domain.Entities;
+using BookService.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace BookService.Infrastructure.Data;
@@ -138,7 +139,7 @@ public class BookServiceDbContext : DbContext
                 .HasColumnName("status")
                 .HasColumnType("integer")
                 .IsRequired()
-                .HasDefaultValue(0);  // Default: Draft
+                .HasDefaultValue(BookStatus.Draft);
 
             entity.Property(b => b.ImageUrl)
                 .HasColumnName("image_url")
@@ -147,18 +148,18 @@ public class BookServiceDbContext : DbContext
 
             entity.Property(b => b.PublishedDate)
                 .HasColumnName("published_date")
-                .HasColumnType("timestamp without time zone")
+                .HasColumnType("timestamp with time zone")
                 .IsRequired(false);
 
             entity.Property(b => b.CreatedAt)
                 .HasColumnName("created_at")
-                .HasColumnType("timestamp without time zone")
+                .HasColumnType("timestamp with time zone")
                 .IsRequired()
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.Property(b => b.UpdatedAt)
                 .HasColumnName("updated_at")
-                .HasColumnType("timestamp without time zone")
+                .HasColumnType("timestamp with time zone")
                 .IsRequired()
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
