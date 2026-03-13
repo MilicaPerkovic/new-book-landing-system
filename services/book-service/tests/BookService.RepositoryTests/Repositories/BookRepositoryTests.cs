@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Testcontainers.PostgreSql;
 using Xunit;
 using BookService.Domain.Entities;
@@ -52,7 +54,7 @@ public class BookRepositoryTests : IAsyncLifetime
         await _dbContext.Database.EnsureCreatedAsync();
 
         // Initialize repository
-        var logger = new Microsoft.Extensions.Logging.NullLogger<BookRepository>();
+        var logger = NullLogger<BookRepository>.Instance;
         _repository = new BookRepository(_dbContext, logger);
     }
 
@@ -87,14 +89,12 @@ public class BookRepositoryTests : IAsyncLifetime
         );
 
         // Act: Create book in repository
-        var bookId = await _repository!.CreateAsync(book);
+        await _repository!.CreateAsync(book);
 
         // Assert: Book saved with ID
-        Assert.NotEqual(Guid.Empty, bookId);
-
-        // Verify book is in database
-        var savedBook = await _dbContext!.Books.FindAsync(bookId);
+        var savedBook = await _dbContext!.Books.FirstOrDefaultAsync(b => b.Isbn == "978-0-451-52494-2");
         Assert.NotNull(savedBook);
+        Assert.NotEqual(Guid.Empty, savedBook.Id);
         Assert.Equal("1984", savedBook.Title);
         Assert.Equal("George Orwell", savedBook.Author);
     }
@@ -143,10 +143,12 @@ public class BookRepositoryTests : IAsyncLifetime
             "Dystopian",
             15.99m
         );
-        var bookId = await _repository!.CreateAsync(book);
+        await _repository!.CreateAsync(book);
+        var savedBook = await _dbContext!.Books.FirstAsync();
+
 
         // Act: Retrieve by ID
-        var retrieved = await _repository.GetByIdAsync(bookId);
+        var retrieved = await _repository.GetByIdAsync(savedBook.Id);
 
         // Assert: Found book with correct data
         Assert.NotNull(retrieved);
@@ -179,7 +181,7 @@ public class BookRepositoryTests : IAsyncLifetime
 
         // Assert: Returns all books
         Assert.NotEmpty(books);
-        Assert.True(books.Count >= 2);
+        Assert.Equal(2, books.Count());
     }
 
     [Fact]
@@ -198,6 +200,7 @@ public class BookRepositoryTests : IAsyncLifetime
 
         // Assert: Only published books returned
         Assert.NotEmpty(published);
+        Assert.Single(published);
         Assert.All(published, b => Assert.Equal(BookStatus.Published, b.Status));
     }
 
@@ -222,10 +225,11 @@ public class BookRepositoryTests : IAsyncLifetime
     {
         // Arrange: Create book
         var book = Book.CreateNew("1984", "Orwell", "978-0-451-52494-2", "Dystopian", 15.99m);
-        var bookId = await _repository!.CreateAsync(book);
+        await _repository!.CreateAsync(book);
+        var savedBook = await _dbContext!.Books.FirstAsync();
 
         // Act: Check exists
-        var exists = await _repository.ExistsAsync(bookId);
+        var exists = await _repository.ExistsAsync(savedBook.Id);
 
         // Assert: Book exists
         Assert.True(exists);
@@ -275,20 +279,20 @@ public class BookRepositoryTests : IAsyncLifetime
     {
         // Arrange: Create and save book
         var book = Book.CreateNew("Original Title", "Author", "978-0-451-52494-2", "Original", 10m);
-        var bookId = await _repository!.CreateAsync(book);
+        await _repository!.CreateAsync(book);
 
         // Get the saved book
-        var savedBook = await _repository.GetByIdAsync(bookId);
+        var savedBook = await _repository.GetByIsbnAsync("978-0-451-52494-2");
         Assert.NotNull(savedBook);
 
-        // Update title (simulate update via private field reflection for testing)
+        // Update title 
         savedBook.Update("New Title", "Author", "Updated description", 15m);
 
         // Act: Update in repository
         await _repository.UpdateAsync(savedBook);
 
         // Assert: Changes persisted
-        var updated = await _repository.GetByIdAsync(bookId);
+        var updated = await _repository.GetByIdAsync(savedBook.Id);
         Assert.NotNull(updated);
         Assert.Equal("New Title", updated.Title);
         Assert.Equal(15m, updated.Price);
@@ -316,17 +320,19 @@ public class BookRepositoryTests : IAsyncLifetime
     {
         // Arrange: Create book
         var book = Book.CreateNew("To Delete", "Author", "978-0-451-52494-2", "Will be deleted", 10m);
-        var bookId = await _repository!.CreateAsync(book);
+        await _repository!.CreateAsync(book);
+        var savedBook = await _dbContext!.Books.FirstAsync();
+
 
         // Verify it exists
-        var exists = await _repository.ExistsAsync(bookId);
+        var exists = await _repository.ExistsAsync(savedBook.Id);
         Assert.True(exists);
 
         // Act: Delete
-        await _repository.DeleteAsync(bookId);
+        await _repository.DeleteAsync(savedBook.Id);
 
         // Assert: No longer exists
-        var stillExists = await _repository.ExistsAsync(bookId);
+        var stillExists = await _repository.ExistsAsync(savedBook.Id);
         Assert.False(stillExists);
     }
 
@@ -334,7 +340,8 @@ public class BookRepositoryTests : IAsyncLifetime
     public async Task DeleteAsync_WithNonExistentId_DoesNotThrow()
     {
         // Act & Assert: Should not throw for non-existent ID
-        await _repository!.DeleteAsync(Guid.NewGuid());
+        var ex = await Record.ExceptionAsync(() => _repository!.DeleteAsync(Guid.NewGuid()));
+        Assert.Null(ex);
     }
 
     #endregion
@@ -357,8 +364,8 @@ public class BookRepositoryTests : IAsyncLifetime
         var publishedCount = await _repository.GetCountByStatusAsync(BookStatus.Published);
 
         // Assert: Correct counts
-        Assert.True(draftCount > 0);
-        Assert.True(publishedCount > 0);
+        Assert.Equal(1, draftCount);
+        Assert.Equal(1, publishedCount);
     }
 
     #endregion
@@ -374,16 +381,14 @@ public class BookRepositoryTests : IAsyncLifetime
             .ToList();
 
         // Act: Create all books
-        var ids = new List<Guid>();
         foreach (var book in books)
         {
-            ids.Add(await _repository!.CreateAsync(book));
+            await _repository!.CreateAsync(book);
         }
 
         // Assert: All created and retrievable
-        Assert.Equal(5, ids.Count);
         var allBooks = await _repository.GetAllAsync();
-        Assert.True(allBooks.Count >= 5);
+        Assert.Equal(5, allBooks.Count());
     }
 
     #endregion
