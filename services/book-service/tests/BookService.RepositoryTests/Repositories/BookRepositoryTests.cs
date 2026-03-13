@@ -337,11 +337,11 @@ public class BookRepositoryTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task DeleteAsync_WithNonExistentId_DoesNotThrow()
+    public async Task DeleteAsync_WithNonExistentId_ThrowsInvalidOperationException()
     {
-        // Act & Assert: Should not throw for non-existent ID
-        var ex = await Record.ExceptionAsync(() => _repository!.DeleteAsync(Guid.NewGuid()));
-        Assert.Null(ex);
+        // Act & Assert: Repository throws when ID does not exist
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _repository!.DeleteAsync(Guid.NewGuid()));
     }
 
     #endregion
