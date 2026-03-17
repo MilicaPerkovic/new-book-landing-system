@@ -3,6 +3,8 @@ package si.um.feri.userservice.grpc.service;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import net.devh.boot.grpc.server.service.GrpcService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import si.um.feri.userservice.application.command.AuthenticateUserCommand;
 import si.um.feri.userservice.application.command.RegisterUserCommand;
 import si.um.feri.userservice.application.command.UpdateUserProfileCommand;
@@ -35,6 +37,8 @@ import java.util.UUID;
 @GrpcService
 public class UserGrpcService extends UserServiceGrpc.UserServiceImplBase {
 
+    private static final Logger LOG = LoggerFactory.getLogger(UserGrpcService.class);
+
     private final UserApplicationService userApplicationService;
     private final AuthenticationService authenticationService;
     private final TokenService tokenService;
@@ -50,6 +54,7 @@ public class UserGrpcService extends UserServiceGrpc.UserServiceImplBase {
     @Override
     public void registerUser(RegisterUserRequest request, StreamObserver<RegisterUserResponse> responseObserver) {
         try {
+            LOG.info("Handling RegisterUser request: email={}, role={}", request.getEmail(), request.getRole());
             validateRegisterRequest(request);
 
             RegisterUserCommand command = new RegisterUserCommand(
@@ -66,6 +71,7 @@ public class UserGrpcService extends UserServiceGrpc.UserServiceImplBase {
 
             responseObserver.onNext(response);
             responseObserver.onCompleted();
+            LOG.info("RegisterUser succeeded: userId={}", user.id());
         } catch (Exception ex) {
             onError(ex, responseObserver);
         }
@@ -75,6 +81,7 @@ public class UserGrpcService extends UserServiceGrpc.UserServiceImplBase {
     public void authenticateUser(AuthenticateUserRequest request,
                                  StreamObserver<AuthenticateUserResponse> responseObserver) {
         try {
+            LOG.info("Handling AuthenticateUser request: email={}", request.getEmail());
             if (request.getEmail().isBlank() || request.getPassword().isBlank()) {
                 throw Status.INVALID_ARGUMENT.withDescription("email and password are required").asRuntimeException();
             }
@@ -89,6 +96,7 @@ public class UserGrpcService extends UserServiceGrpc.UserServiceImplBase {
 
             responseObserver.onNext(response);
             responseObserver.onCompleted();
+            LOG.info("AuthenticateUser succeeded: email={}", request.getEmail());
         } catch (Exception ex) {
             onError(ex, responseObserver);
         }
@@ -98,6 +106,7 @@ public class UserGrpcService extends UserServiceGrpc.UserServiceImplBase {
     public void getUserById(GetUserByIdRequest request, StreamObserver<GetUserByIdResponse> responseObserver) {
         try {
             UUID userId = parseUuid(request.getUserId(), "user_id");
+            LOG.info("Handling GetUserById request: userId={}", userId);
             UserResult user = userApplicationService.getById(userId);
 
             GetUserByIdResponse response = GetUserByIdResponse.newBuilder()
@@ -109,6 +118,7 @@ public class UserGrpcService extends UserServiceGrpc.UserServiceImplBase {
 
             responseObserver.onNext(response);
             responseObserver.onCompleted();
+            LOG.info("GetUserById succeeded: userId={}", userId);
         } catch (Exception ex) {
             onError(ex, responseObserver);
         }
@@ -119,6 +129,7 @@ public class UserGrpcService extends UserServiceGrpc.UserServiceImplBase {
                                   StreamObserver<UpdateUserProfileResponse> responseObserver) {
         try {
             UUID userId = parseUuid(request.getUserId(), "user_id");
+            LOG.info("Handling UpdateUserProfile request: userId={}", userId);
             if (request.getFullName().isBlank()) {
                 throw Status.INVALID_ARGUMENT.withDescription("full_name is required").asRuntimeException();
             }
@@ -134,6 +145,7 @@ public class UserGrpcService extends UserServiceGrpc.UserServiceImplBase {
 
             responseObserver.onNext(response);
             responseObserver.onCompleted();
+            LOG.info("UpdateUserProfile succeeded: userId={}", userId);
         } catch (Exception ex) {
             onError(ex, responseObserver);
         }
@@ -142,6 +154,7 @@ public class UserGrpcService extends UserServiceGrpc.UserServiceImplBase {
     @Override
     public void validateToken(ValidateTokenRequest request, StreamObserver<ValidateTokenResponse> responseObserver) {
         try {
+            LOG.info("Handling ValidateToken request");
             if (request.getToken().isBlank()) {
                 throw Status.INVALID_ARGUMENT.withDescription("token is required").asRuntimeException();
             }
@@ -156,6 +169,7 @@ public class UserGrpcService extends UserServiceGrpc.UserServiceImplBase {
 
             responseObserver.onNext(responseBuilder.build());
             responseObserver.onCompleted();
+            LOG.info("ValidateToken finished: valid={}", validationResult.isPresent());
         } catch (Exception ex) {
             onError(ex, responseObserver);
         }
@@ -197,6 +211,7 @@ public class UserGrpcService extends UserServiceGrpc.UserServiceImplBase {
     }
 
     private void onError(Exception ex, StreamObserver<?> responseObserver) {
+        LOG.warn("gRPC request failed: {}", ex.getMessage());
         if (ex instanceof io.grpc.StatusRuntimeException statusRuntimeException) {
             responseObserver.onError(statusRuntimeException);
             return;
@@ -215,6 +230,7 @@ public class UserGrpcService extends UserServiceGrpc.UserServiceImplBase {
             return;
         }
 
+        LOG.error("Unhandled gRPC exception", ex);
         responseObserver.onError(Status.INTERNAL.withDescription("internal server error").asRuntimeException());
     }
 }
