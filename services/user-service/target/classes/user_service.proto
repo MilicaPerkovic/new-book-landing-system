@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "si.um.feri.userservice.grpc";
+option java_outer_classname = "UserServiceProto";
+
+package user.v1;
+
+service UserService {
+  rpc RegisterUser(RegisterUserRequest) returns (RegisterUserResponse);
+  rpc AuthenticateUser(AuthenticateUserRequest) returns (AuthenticateUserResponse);
+  rpc GetUserById(GetUserByIdRequest) returns (GetUserByIdResponse);
+  rpc UpdateUserProfile(UpdateUserProfileRequest) returns (UpdateUserProfileResponse);
+  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+}
+
+message RegisterUserRequest {
+  string email = 1;
+  string password = 2;
+  string full_name = 3;
+  string role = 4;
+}
+
+message RegisterUserResponse {
+  string user_id = 1;
+}
+
+message AuthenticateUserRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message AuthenticateUserResponse {
+  string access_token = 1;
+}
+
+message GetUserByIdRequest {
+  string user_id = 1;
+}
+
+message GetUserByIdResponse {
+  string user_id = 1;
+  string email = 2;
+  string full_name = 3;
+  string role = 4;
+}
+
+message UpdateUserProfileRequest {
+  string user_id = 1;
+  string full_name = 2;
+}
+
+message UpdateUserProfileResponse {
+  string user_id = 1;
+  string full_name = 2;
+}
+
+message ValidateTokenRequest {
+  string token = 1;
+}
+
+message ValidateTokenResponse {
+  bool valid = 1;
+  string user_id = 2;
+  string role = 3;
+}

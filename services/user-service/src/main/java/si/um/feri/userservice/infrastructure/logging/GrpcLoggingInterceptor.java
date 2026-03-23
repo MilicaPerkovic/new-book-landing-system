@@ -29,17 +29,18 @@ public class GrpcLoggingInterceptor implements ServerInterceptor {
         if (requestId == null || requestId.isBlank()) {
             requestId = UUID.randomUUID().toString();
         }
+        final String resolvedRequestId = requestId;
 
         final String method = call.getMethodDescriptor().getFullMethodName();
         final long startedAt = System.currentTimeMillis();
 
-        withRequestId(requestId, () -> LOG.info("gRPC request started: method={}", method));
+        withRequestId(resolvedRequestId, () -> LOG.info("gRPC request started: method={}", method));
 
         ServerCall<R, S> forwardingCall = new ForwardingServerCall.SimpleForwardingServerCall<>(call) {
             @Override
             public void close(Status status, Metadata trailers) {
                 long durationMs = System.currentTimeMillis() - startedAt;
-                withRequestId(requestId, () -> LOG.info(
+                withRequestId(resolvedRequestId, () -> LOG.info(
                         "gRPC request finished: method={}, status={}, durationMs={}",
                         method,
                         status.getCode(),
@@ -54,25 +55,25 @@ public class GrpcLoggingInterceptor implements ServerInterceptor {
         return new ForwardingServerCallListener.SimpleForwardingServerCallListener<>(listener) {
             @Override
             public void onCancel() {
-                withRequestId(requestId, () -> LOG.warn("gRPC request cancelled: method={}", method));
+                withRequestId(resolvedRequestId, () -> LOG.warn("gRPC request cancelled: method={}", method));
                 super.onCancel();
             }
 
             @Override
             public void onComplete() {
-                withRequestId(requestId, () -> LOG.debug("gRPC request complete callback: method={}", method));
+                withRequestId(resolvedRequestId, () -> LOG.debug("gRPC request complete callback: method={}", method));
                 super.onComplete();
             }
 
             @Override
             public void onHalfClose() {
-                withRequestId(requestId, () -> LOG.debug("gRPC request half-close: method={}", method));
+                withRequestId(resolvedRequestId, () -> LOG.debug("gRPC request half-close: method={}", method));
                 super.onHalfClose();
             }
 
             @Override
             public void onReady() {
-                withRequestId(requestId, () -> LOG.debug("gRPC call ready: method={}", method));
+                withRequestId(resolvedRequestId, () -> LOG.debug("gRPC call ready: method={}", method));
                 super.onReady();
             }
         };
