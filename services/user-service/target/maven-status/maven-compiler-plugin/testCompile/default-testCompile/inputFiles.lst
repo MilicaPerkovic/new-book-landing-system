@@ -1,0 +1,7 @@
+/Users/micko/Desktop/itaproject/new-book-landing-system/services/user-service/src/test/java/si/um/feri/userservice/UserServiceApplicationTests.java
+/Users/micko/Desktop/itaproject/new-book-landing-system/services/user-service/src/test/java/si/um/feri/userservice/application/service/AuthenticationServiceTest.java
+/Users/micko/Desktop/itaproject/new-book-landing-system/services/user-service/src/test/java/si/um/feri/userservice/application/service/UserApplicationServiceTest.java
+/Users/micko/Desktop/itaproject/new-book-landing-system/services/user-service/src/test/java/si/um/feri/userservice/domain/repository/UserRepositoryTest.java
+/Users/micko/Desktop/itaproject/new-book-landing-system/services/user-service/src/test/java/si/um/feri/userservice/grpc/service/UserGrpcServiceTest.java
+/Users/micko/Desktop/itaproject/new-book-landing-system/services/user-service/src/test/java/si/um/feri/userservice/infrastructure/security/BcryptPasswordHasherTest.java
+/Users/micko/Desktop/itaproject/new-book-landing-system/services/user-service/src/test/java/si/um/feri/userservice/infrastructure/security/SimpleTokenServiceTest.java

@@ -1,0 +1,27 @@
+name: User Service Tests
+
+on:
+  push:
+    branches: [ "**" ]
+    paths:
+      - 'services/user-service/**'
+      - '.github/workflows/user-service.yml'
+
+jobs:
+  test-user-service:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Run unit tests
+        working-directory: services/user-service
+        run: mvn -B test

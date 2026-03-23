@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: si.um.feri.userservice.grpc.service.UserGrpcServiceTest
+-------------------------------------------------------------------------------
+Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.269 s -- in si.um.feri.userservice.grpc.service.UserGrpcServiceTest

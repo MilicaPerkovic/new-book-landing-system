@@ -1,0 +1,68 @@
+name: Book Service Tests
+
+on:
+  push:
+    branches: [ "**" ]
+    paths:
+      - 'services/book-service/**'
+      - '.github/workflows/book-service.yml'
+
+jobs:
+  test-book-service:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: bookservice_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore dependencies
+      run: |
+        dotnet restore src/BookService.API/BookService.API.csproj
+        dotnet restore tests/BookService.UnitTests/BookService.UnitTests.csproj
+        dotnet restore tests/BookService.RepositoryTests/BookService.RepositoryTests.csproj
+        dotnet restore tests/BookService.IntegrationTests/BookService.IntegrationTests.csproj
+      working-directory: ${{ github.workspace }}/services/book-service
+
+    - name: Build
+      run: |
+        dotnet build --no-restore -c Release src/BookService.API/BookService.API.csproj
+        dotnet build --no-restore -c Release tests/BookService.UnitTests/BookService.UnitTests.csproj
+        dotnet build --no-restore -c Release tests/BookService.RepositoryTests/BookService.RepositoryTests.csproj
+        dotnet build --no-restore -c Release tests/BookService.IntegrationTests/BookService.IntegrationTests.csproj
+      working-directory: ${{ github.workspace }}/services/book-service
+
+    - name: Run Unit Tests
+      run: dotnet test tests/BookService.UnitTests/BookService.UnitTests.csproj --no-build -c Release --verbosity normal --results-directory "${{ runner.temp }}/test-results/unit" --logger "trx;LogFileName=unit-tests.trx"
+      working-directory: ${{ github.workspace }}/services/book-service
+
+    - name: Run Repository Tests
+      run: dotnet test tests/BookService.RepositoryTests/BookService.RepositoryTests.csproj --no-build -c Release --verbosity normal --results-directory "${{ runner.temp }}/test-results/repository" --logger "trx;LogFileName=repo-tests.trx"
+      working-directory: ${{ github.workspace }}/services/book-service
+      env:
+        ConnectionStrings__DefaultConnection: "Server=localhost;Port=5432;Database=bookservice_test;User Id=postgres;Password=postgres;"
+
+    - name: Run Integration Tests
+      run: dotnet test tests/BookService.IntegrationTests/BookService.IntegrationTests.csproj --no-build -c Release --verbosity normal --results-directory "${{ runner.temp }}/test-results/integration" --logger "trx;LogFileName=integration-tests.trx"
+      working-directory: ${{ github.workspace }}/services/book-service
