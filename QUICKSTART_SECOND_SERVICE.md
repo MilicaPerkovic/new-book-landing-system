@@ -81,7 +81,7 @@ docker run --name users-db \
 	-e POSTGRES_PASSWORD=postgres \
 	-e POSTGRES_USER=postgres \
 	-e POSTGRES_DB=users_db \
-	-p 5432:5432 \
+	-p 5433:5432 \
 	-d postgres:16-alpine
 ```
 
@@ -93,7 +93,7 @@ docker ps --filter name=users-db
 
 Expected:
 1. Container `users-db` is up.
-2. Port `5432` is exposed.
+2. Host port `5433` is exposed (mapped to container port `5432`).
 
 ---
 
@@ -102,11 +102,11 @@ Expected:
 Defaults are already configured in application settings, but you can set explicit values:
 
 ```bash
-export DB_URL='jdbc:postgresql://localhost:5432/users_db'
+export DB_URL='jdbc:postgresql://localhost:5433/users_db'
 export DB_USERNAME='postgres'
 export DB_PASSWORD='postgres'
 export GRPC_PORT='9090'
-export JWT_SECRET='change-this-secret-key-to-at-least-32-characters'
+export JWT_SECRET='kjyuihjyag123hakjnchtgapokajuhyass'
 ```
 
 Note:
@@ -152,14 +152,21 @@ If you get `mvn: command not found`:
 
 ## 7. Validate gRPC Endpoints Manually
 
-Keep service running on `localhost:9090`.
+Keep service running and use the correct host gRPC port:
+1. Source mode (`mvn spring-boot:run`): `localhost:9090`
+2. Docker fallback mapping (`-p 9091:9090`): `localhost:9091`
 
 List service and methods:
 
 ```bash
-grpcurl -plaintext localhost:9090 list
-grpcurl -plaintext localhost:9090 list user.v1.UserService
+grpcurl -plaintext localhost:9091 list
+grpcurl -plaintext localhost:9091 list user.v1.UserService
 ```
+
+Expected services from `list` include:
+1. `grpc.health.v1.Health`
+2. `grpc.reflection.v1alpha.ServerReflection`
+3. `user.v1.UserService`
 
 Expected methods:
 1. RegisterUser
@@ -173,27 +180,35 @@ Register user:
 ```bash
 grpcurl -plaintext \
 	-d '{"email":"author1@example.com","password":"StrongPassword123","full_name":"Author One","role":"AUTHOR"}' \
-	localhost:9090 user.v1.UserService/RegisterUser
+	localhost:9091 user.v1.UserService/RegisterUser
 ```
 
 Authenticate user:
 
 ```bash
 grpcurl -plaintext \
-	-d '{"email":"author1@example.com","password":"StrongPassword123"}' \
-	localhost:9090 user.v1.UserService/AuthenticateUser
+	-d '{"email":"author2@example.com","password":"StrongPassword1234"}' \
+	localhost:9091 user.v1.UserService/AuthenticateUser
 ```
 
 Validate token (replace token value):
 
 ```bash
 grpcurl -plaintext \
-	-d '{"token":"PASTE_ACCESS_TOKEN_HERE"}' \
-	localhost:9090 user.v1.UserService/ValidateToken
+	-d '{"token":"eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIzMDZjYTU2Yi0wYzljLTQxZGYtOWE1OS02NDg4NTU4OWU3ODEiLCJyb2xlIjoiQVVUSE9SIiwiaWF0IjoxNzc0MjQ4NjY5LCJleHAiOjE3NzQyNTIyNjl9.wS4zl1bXgaYNI-7_PjeZ6mJ_JCUC_RxbXolaltf1VoI"}' \
+	localhost:9091 user.v1.UserService/ValidateToken
 ```
 
 Important for proto field names:
 1. Use `full_name` in grpcurl JSON, not `fullName`.
+2. Opening `http://localhost:9091` in a browser is expected to fail because gRPC is not plain HTTP.
+3. Use grpcui for browser testing:
+
+```bash
+docker run --rm -p 8081:8080 fullstorydev/grpcui -plaintext host.docker.internal:9091
+```
+
+Then open `http://localhost:8081`.
 
 ---
 
@@ -210,17 +225,29 @@ Run container and connect to host PostgreSQL:
 ```bash
 docker run --rm \
 	-p 9090:9090 \
-	-e DB_URL='jdbc:postgresql://host.docker.internal:5432/users_db' \
+	-e DB_URL='jdbc:postgresql://host.docker.internal:5433/users_db' \
 	-e DB_USERNAME='postgres' \
 	-e DB_PASSWORD='postgres' \
-	-e JWT_SECRET='change-this-secret-key-to-at-least-32-characters' \
+	-e JWT_SECRET='jahuksjikjaujanhgtei123456kjaser1' \
+	user-service:local
+```
+
+If port `9090` is already in use (for example by local `mvn spring-boot:run`), run Docker on `9091`:
+
+```bash
+docker run --rm \
+	-p 9091:9090 \
+	-e DB_URL='jdbc:postgresql://host.docker.internal:5433/users_db' \
+	-e DB_USERNAME='postgres' \
+	-e DB_PASSWORD='postgres' \
+	-e JWT_SECRET='jahuksjikjaujanhgtei123456kjaser1' \
 	user-service:local
 ```
 
 Expected:
 1. Container starts.
 2. Flyway migration executes.
-3. gRPC is reachable at `localhost:9090`.
+3. gRPC is reachable at `localhost:9090` (or `localhost:9091` if using fallback mapping).
 
 ---
 
@@ -276,11 +303,14 @@ Prepare screenshots or terminal outputs for:
 2. gRPC returns invalid argument
 - Check JSON field names against proto (`full_name`, `user_id`).
 
-3. DB connection failure
+3. Browser cannot open `localhost:9091` / parse response error
+- This is expected for gRPC endpoints. Use grpcurl, or run grpcui on `localhost:8081`.
+
+4. DB connection failure
 - Ensure `users-db` container is running and credentials are correct.
 
-4. JWT errors
+5. JWT errors
 - Ensure `JWT_SECRET` length is at least 32 characters.
 
-5. Port conflict on `9090`
-- Change `GRPC_PORT` and call grpcurl on new port.
+6. Port conflict on `9090`
+- Stop the process using `9090`, or run Docker with `-p 9091:9090` and call grpcurl on `localhost:9091`.

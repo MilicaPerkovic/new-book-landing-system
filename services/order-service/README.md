@@ -1,56 +1,70 @@
 # order-service
 
-This project uses Quarkus, the Supersonic Subatomic Java Framework.
+Reactive Quarkus 3 microservice that owns the preorder/order lifecycle for the Book Landing System. It persists orders in PostgreSQL, will expose reactive REST endpoints, and emits order-domain events over ActiveMQ Artemis.
 
-If you want to learn more about Quarkus, please visit its website: https://quarkus.io/ .
+## Current status (Part 1)
+- Order aggregate (`OrderEntity`) plus lifecycle enum are implemented with optimistic locking and timestamp management.
+- Flyway migration `V1__create_orders_table.sql` provisions schema `orders` with indexes required for future dashboards.
+- Testcontainers-backed repository spec (`OrderRepositoryTest`) persists and reloads an order against PostgreSQL 15 to prove the reactive persistence stack works end-to-end.
+
+## Database configuration
+| Property | Default | Description |
+| --- | --- | --- |
+| `ORDERS_DB_HOST` | `localhost` | PostgreSQL host used by dev/test profiles |
+| `ORDERS_DB_PORT` | `5440` | Host port mapped to the container/internal 5432 |
+| `ORDERS_DB_DATABASE` | `orders` | Database/schema used by the service |
+| `ORDERS_DB_USERNAME` | `orders_dev` | Login passed to both JDBC + reactive clients |
+| `ORDERS_DB_PASSWORD` | `orders_dev` | Password counterpart |
+
+Startup automatically runs Flyway migrations (`quarkus.flyway.migrate-at-start=true`). Schema defaults to `orders`, so make sure the database user can create schemas on first boot.
 
 ## Running the application in dev mode
 
-You can run your application in dev mode that enables live coding using:
-```shell script
-./mvnw compile quarkus:dev
-```
+1. Provision PostgreSQL (example):
+   ```bash
+   docker run --rm -p 5440:5432 \
+     -e POSTGRES_DB=orders \
+     -e POSTGRES_USER=orders_dev \
+     -e POSTGRES_PASSWORD=orders_dev \
+     postgres:15.6-alpine
+   ```
+2. From the monorepo root execute:
+   ```bash
+   ./mvnw -pl services/order-service quarkus:dev
+   ```
 
-> **_NOTE:_**  Quarkus now ships with a Dev UI, which is available in dev mode only at http://localhost:8080/q/dev/.
+The Quarkus Dev UI will be exposed at http://localhost:8080/q/dev/.
+
+## Testing
+
+`OrderRepositoryTest` boots PostgreSQL 15 via Testcontainers; no manual DB setup is needed. Run:
+
+```bash
+./mvnw test -pl services/order-service -am
+```
 
 ## Packaging and running the application
 
-The application can be packaged using:
-```shell script
-./mvnw package
-```
-It produces the `quarkus-run.jar` file in the `target/quarkus-app/` directory.
-Be aware that it’s not an _über-jar_ as the dependencies are copied into the `target/quarkus-app/lib/` directory.
-
-The application is now runnable using `java -jar target/quarkus-app/quarkus-run.jar`.
-
-If you want to build an _über-jar_, execute the following command:
-```shell script
-./mvnw package -Dquarkus.package.jar.type=uber-jar
+```bash
+./mvnw package -pl services/order-service -am
+java -jar services/order-service/target/quarkus-app/quarkus-run.jar
 ```
 
-The application, packaged as an _über-jar_, is now runnable using `java -jar target/*-runner.jar`.
+To build an _über-jar_:
 
-## Creating a native executable
-
-You can create a native executable using: 
-```shell script
-./mvnw package -Dnative
+```bash
+./mvnw package -pl services/order-service -am -Dquarkus.package.jar.type=uber-jar
+java -jar services/order-service/target/order-service-1.0.0-SNAPSHOT-runner.jar
 ```
 
-Or, if you don't have GraalVM installed, you can run the native executable build in a container using: 
-```shell script
-./mvnw package -Dnative -Dquarkus.native.container-build=true
+## Native executable (optional)
+
+```bash
+./mvnw package -pl services/order-service -am -Dnative
 ```
 
-You can then execute your native executable with: `./target/order-service-1.0.0-SNAPSHOT-runner`
+Or rely on containerized native builds:
 
-If you want to learn more about building native executables, please consult https://quarkus.io/guides/maven-tooling.
-
-## Provided Code
-
-### REST
-
-Easily start your REST Web Services
-
-[Related guide section...](https://quarkus.io/guides/getting-started-reactive#reactive-jax-rs-resources)
+```bash
+./mvnw package -pl services/order-service -am -Dnative -Dquarkus.native.container-build=true
+```
