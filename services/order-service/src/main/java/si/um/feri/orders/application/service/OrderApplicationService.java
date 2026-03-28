@@ -9,11 +9,17 @@ import si.um.feri.orders.application.mapper.OrderMapper;
 import si.um.feri.orders.domain.OrderEntity;
 import si.um.feri.orders.domain.OrderRepository;
 import si.um.feri.orders.domain.OrderStatus;
+import si.um.feri.orders.domain.event.OrderCancelled;
+import si.um.feri.orders.domain.event.OrderConfirmed;
+import si.um.feri.orders.domain.event.OrderCreated;
+import si.um.feri.orders.domain.event.OrderFulfilled;
+import si.um.feri.orders.infrastructure.event.OrderEventPublisher;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -25,6 +31,7 @@ import java.util.UUID;
  * - Enforce business rules
  * - Coordinate domain operations
  * - Translate between DTOs and domain entities
+ * - Publish domain events after state changes
  * 
  * All methods are transaction-safe and support reactive execution.
  */
@@ -36,6 +43,9 @@ public class OrderApplicationService {
 
     @Inject
     OrderMapper orderMapper;
+
+    @Inject
+    OrderEventPublisher eventPublisher;
 
     /**
      * Create a new preorder for a book.
@@ -61,8 +71,19 @@ public class OrderApplicationService {
             request.getPrice()
         );
 
-        // Persist and return as DTO
+        // Persist and return as DTO, then publish event
         return orderRepository.persistAndFlush(order)
+            .onItem().invoke(persistedOrder -> {
+                // Publish OrderCreated event after successful persistence
+                var event = new OrderCreated(
+                    persistedOrder.getId(),
+                    persistedOrder.getBookId(),
+                    persistedOrder.getUserId(),
+                    persistedOrder.getQuantity(),
+                    persistedOrder.getPriceSnapshot()
+                );
+                eventPublisher.publish(event);
+            })
             .map(orderMapper::toDtoResponse);
     }
 
@@ -108,6 +129,15 @@ public class OrderApplicationService {
                 return order;
             })
             .chain(order -> orderRepository.persistAndFlush(order))
+            .onItem().invoke(confirmedOrder -> {
+                // Publish OrderConfirmed event after successful persistence
+                var event = new OrderConfirmed(
+                    confirmedOrder.getId(),
+                    confirmedOrder.getBookId(),
+                    confirmedOrder.getUpdatedAt()
+                );
+                eventPublisher.publish(event);
+            })
             .map(orderMapper::toDtoResponse);
     }
 
@@ -139,6 +169,15 @@ public class OrderApplicationService {
                 return order;
             })
             .chain(order -> orderRepository.persistAndFlush(order))
+            .onItem().invoke(cancelledOrder -> {
+                // Publish OrderCancelled event after successful persistence
+                var event = new OrderCancelled(
+                    cancelledOrder.getId(),
+                    "Order cancelled",
+                    cancelledOrder.getUpdatedAt()
+                );
+                eventPublisher.publish(event);
+            })
             .map(orderMapper::toDtoResponse);
     }
 
@@ -169,6 +208,15 @@ public class OrderApplicationService {
                 return order;
             })
             .chain(order -> orderRepository.persistAndFlush(order))
+            .onItem().invoke(fulfilledOrder -> {
+                // Publish OrderFulfilled event after successful persistence
+                var event = new OrderFulfilled(
+                    fulfilledOrder.getId(),
+                    fulfilledOrder.getBookId(),
+                    fulfilledOrder.getUpdatedAt()
+                );
+                eventPublisher.publish(event);
+            })
             .map(orderMapper::toDtoResponse);
     }
 

@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database for order-service
+  postgresql:
+    image: postgres:15-alpine
+    container_name: order-service-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: orders_db
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - order-network
+
+  # ActiveMQ Artemis Message Broker
+  artemis:
+    image: apache/activemq-artemis:latest-alpine
+    container_name: order-service-artemis
+    ports:
+      - "61616:61616"    # JMS protocol port
+      - "8161:8161"      # Web console (admin/admin)
+    environment:
+      ARTEMIS_USER: artemis
+      ARTEMIS_PASSWORD: artemis
+    volumes:
+      - artemis-data:/var/lib/artemis-instance
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8161/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - order-network
+
+  # Optional: pgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: order-service-pgadmin
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    depends_on:
+      - postgresql
+    networks:
+      - order-network
+
+volumes:
+  postgres-data:
+    driver: local
+  artemis-data:
+    driver: local
+
+networks:
+  order-network:
+    driver: bridge
