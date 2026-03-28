@@ -21,7 +21,13 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
+
+import si.um.feri.orders.domain.event.OrderCreated;
+import si.um.feri.orders.domain.event.OrderConfirmed;
+import si.um.feri.orders.domain.event.OrderCancelled;
+import si.um.feri.orders.domain.event.OrderFulfilled;
+import si.um.feri.orders.infrastructure.event.OrderEventPublisher;
 
 /**
  * Unit tests for OrderApplicationService.
@@ -42,12 +48,16 @@ class OrderApplicationServiceTest {
     @Mock
     private OrderMapper orderMapper;
 
+    @Mock
+    private OrderEventPublisher eventPublisher;
+
     @BeforeEach
     void setup() {
         MockitoAnnotations.openMocks(this);
         service = new OrderApplicationService();
         service.orderRepository = orderRepository;
         service.orderMapper = orderMapper;
+        service.eventPublisher = eventPublisher;
     }
 
     // ==================== CREATE ORDER TESTS ====================
@@ -369,5 +379,133 @@ class OrderApplicationServiceTest {
         assertThrows(InvalidOrderStateTransitionException.class, () ->
             service.fulfillOrder(orderId).await().indefinitely()
         );
+    }
+
+    // ==================== EVENT PUBLISHING TESTS ====================
+
+    @Test
+    void createOrder_publishesOrderCreatedEvent() {
+        // Arrange
+        UUID bookId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        CreateOrderRequest request = new CreateOrderRequest(bookId, userId, 2, new BigDecimal("19.99"));
+
+        OrderEntity createdEntity = OrderEntity.create(bookId, userId, 2, new BigDecimal("19.99"));
+        OrderResponse expectedResponse = new OrderResponse(
+            createdEntity.getId(), bookId, userId, 2, new BigDecimal("19.99"),
+            "PENDING", createdEntity.getCreatedAt(), createdEntity.getUpdatedAt(), 0
+        );
+
+        when(orderRepository.persistAndFlush(any(OrderEntity.class)))
+            .thenReturn(Uni.createFrom().item(createdEntity));
+        when(orderMapper.toDtoResponse(createdEntity))
+            .thenReturn(expectedResponse);
+
+        // Act
+        service.createOrder(request).await().indefinitely();
+
+        // Assert
+        verify(eventPublisher).publish(any(OrderCreated.class));
+    }
+
+    @Test
+    void confirmOrder_publishesOrderConfirmedEvent() {
+        // Arrange
+        UUID orderId = UUID.randomUUID();
+        UUID bookId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        
+        OrderEntity order = OrderEntity.create(bookId, userId, 1, BigDecimal.TEN);
+        order.overrideId(orderId);
+        
+        OrderEntity confirmedOrder = OrderEntity.create(bookId, userId, 1, BigDecimal.TEN);
+        confirmedOrder.overrideId(orderId);
+        confirmedOrder.updateStatus(OrderStatus.CONFIRMED);
+
+        OrderResponse expectedResponse = new OrderResponse(
+            orderId, bookId, userId, 1, BigDecimal.TEN,
+            "CONFIRMED", confirmedOrder.getCreatedAt(), confirmedOrder.getUpdatedAt(), 0
+        );
+
+        when(orderRepository.findById(orderId))
+            .thenReturn(Uni.createFrom().item(order));
+        when(orderRepository.persistAndFlush(any(OrderEntity.class)))
+            .thenReturn(Uni.createFrom().item(confirmedOrder));
+        when(orderMapper.toDtoResponse(confirmedOrder))
+            .thenReturn(expectedResponse);
+
+        // Act
+        service.confirmOrder(orderId).await().indefinitely();
+
+        // Assert
+        verify(eventPublisher).publish(any(OrderConfirmed.class));
+    }
+
+    @Test
+    void cancelOrder_publishesOrderCancelledEvent() {
+        // Arrange
+        UUID orderId = UUID.randomUUID();
+        UUID bookId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        
+        OrderEntity order = OrderEntity.create(bookId, userId, 1, BigDecimal.TEN);
+        order.overrideId(orderId);
+        
+        OrderEntity cancelledOrder = OrderEntity.create(bookId, userId, 1, BigDecimal.TEN);
+        cancelledOrder.overrideId(orderId);
+        cancelledOrder.updateStatus(OrderStatus.CANCELLED);
+
+        OrderResponse expectedResponse = new OrderResponse(
+            orderId, bookId, userId, 1, BigDecimal.TEN,
+            "CANCELLED", cancelledOrder.getCreatedAt(), cancelledOrder.getUpdatedAt(), 0
+        );
+
+        when(orderRepository.findById(orderId))
+            .thenReturn(Uni.createFrom().item(order));
+        when(orderRepository.persistAndFlush(any(OrderEntity.class)))
+            .thenReturn(Uni.createFrom().item(cancelledOrder));
+        when(orderMapper.toDtoResponse(cancelledOrder))
+            .thenReturn(expectedResponse);
+
+        // Act
+        service.cancelOrder(orderId).await().indefinitely();
+
+        // Assert
+        verify(eventPublisher).publish(any(OrderCancelled.class));
+    }
+
+    @Test
+    void fulfillOrder_publishesOrderFulfilledEvent() {
+        // Arrange
+        UUID orderId = UUID.randomUUID();
+        UUID bookId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        
+        OrderEntity order = OrderEntity.create(bookId, userId, 1, BigDecimal.TEN);
+        order.overrideId(orderId);
+        order.updateStatus(OrderStatus.CONFIRMED);
+        
+        OrderEntity fulfilledOrder = OrderEntity.create(bookId, userId, 1, BigDecimal.TEN);
+        fulfilledOrder.overrideId(orderId);
+        fulfilledOrder.updateStatus(OrderStatus.CONFIRMED);
+        fulfilledOrder.updateStatus(OrderStatus.FULFILLED);
+
+        OrderResponse expectedResponse = new OrderResponse(
+            orderId, bookId, userId, 1, BigDecimal.TEN,
+            "FULFILLED", fulfilledOrder.getCreatedAt(), fulfilledOrder.getUpdatedAt(), 0
+        );
+
+        when(orderRepository.findById(orderId))
+            .thenReturn(Uni.createFrom().item(order));
+        when(orderRepository.persistAndFlush(any(OrderEntity.class)))
+            .thenReturn(Uni.createFrom().item(fulfilledOrder));
+        when(orderMapper.toDtoResponse(fulfilledOrder))
+            .thenReturn(expectedResponse);
+
+        // Act
+        service.fulfillOrder(orderId).await().indefinitely();
+
+        // Assert
+        verify(eventPublisher).publish(any(OrderFulfilled.class));
     }
 }
