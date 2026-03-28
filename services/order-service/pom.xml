@@ -110,10 +110,31 @@
             <artifactId>mockito-junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-grpc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
         <plugins>
+            <plugin>
+                <groupId>kr.motd.maven</groupId>
+                <artifactId>os-maven-plugin</artifactId>
+                <version>1.7.1</version>
+                <executions>
+                    <execution>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>detect</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>${quarkus.platform.group-id}</groupId>
                 <artifactId>quarkus-maven-plugin</artifactId>
@@ -167,6 +188,11 @@
                     </systemPropertyVariables>
                 </configuration>
             </plugin>
+            <!-- 
+            Protobuf compilation is handled automatically by Quarkus via quarkus-grpc.
+            The quarkus-maven-plugin with generate-code goal processes .proto files in src/main/proto/
+            Remove explicit protobuf-maven-plugin to avoid duplicate class generation.
+            -->
         </plugins>
     </build>
 
