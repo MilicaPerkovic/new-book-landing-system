@@ -1,0 +1,59 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: bookservice-postgres
+    environment:
+      POSTGRES_DB: bookservice
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - bookservice-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Book Service API
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bookservice-api
+    environment:
+      ConnectionStrings__DefaultConnection: "Server=postgres;Port=5432;Database=bookservice;User Id=postgres;Password=postgres;"
+      ASPNETCORE_ENVIRONMENT: Development
+    ports:
+      - "5001:5000"
+    networks:
+      - bookservice-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Adminer (Optional: Database UI at http://localhost:8080)
+  adminer:
+    image: adminer:latest
+    container_name: bookservice-adminer
+    ports:
+      - "8080:8080"
+    networks:
+      - bookservice-network
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+networks:
+  bookservice-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local

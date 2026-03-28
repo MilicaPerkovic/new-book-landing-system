@@ -1,536 +1,324 @@
+# New Book Landing System
 
-## 1. Poslovni Problem in Namen Sistema
+This repository contains a **microservices-based backend foundation** for a Book Landing Platform.
 
+At this stage, the implemented and production-prepared service is:
+- `Book Service` (ASP.NET Core, Clean Architecture, PostgreSQL, tests, Docker, CI)
 
-### Osnovna Funkcionalnost
-Book Landing System je platforma ki omogoča ustvarjanje in upravljanje promocijskih spletnih strani (landing pages) za nove knjižne izdaje. Sistem omogoča ustvarjanje knjig, ustvarjanje strani, pregled osnovne statistike...
-
-### Uporabniki in Pričakovanja
-
-**Avtorji/Založniki:**
-- Ustvarjanje knjig
-- Ustvarjanje strani za svoje knjige
-- Dodajanje vsebin (naslov, opis, slike, cene)
-- Pregled statistike obiskov in prednaročil
-
-**Obiskovalci/Bralci:**
-- Ogled informacij o knjigah
-- Prednaročilo knjige
-- Prejemanje obvestil o izdaji
-
-**Administratorji:**
-- Upravljanje uporabnikov
-- Moderacija vsebin
-- Pregled analitike sistema
-
-### Komunikacija med Komponentami
-Komponente sistema komunicirajo prek REST API-jev z JSON formatom. Za asinhrono obdelavo dogodkov (npr. pošiljanje emailov) se uporablja sporočilni posrednik (RabbitMQ).
+Other services (User, Landing Page, Order, Notification, Analytics) are documented as architecture and next steps.
 
 ---
 
-## 2. Glavne Domene in Mikrostoritve (Izbira tri)
+## 1) What is done (current state)
 
-### Book Service (Storitev za Knjige)
-**Odgovornosti:**
-- Upravljanje podatkov o knjigah (CRUD operacije)
-- Shranjevanje metapodatkov (naslov, avtor, opis, ISBN, cena)
-- Upravljanje slik knjig
-- Validacija knjižnih podatkov
+### Implemented in code
+- Clean architecture split into `API`, `Domain`, and `Infrastructure` layers.
+- Full Book REST API (CRUD + state transitions + statistics).
+- Validation with `FluentValidation`.
+- Global exception handling middleware.
+- PostgreSQL persistence with `EF Core` + repository pattern.
+- Structured logging with `Serilog`.
+- Three testing levels: unit, repository (real DB), integration (HTTP).
+- Dockerfile and Docker Compose for local orchestration.
+- GitHub Actions workflow for CI build/test/container checks.
 
-### User Service (Storitev za Uporabnike)
-**Odgovornosti:**
-- Registracija in avtentikacija uporabnikov
-- Upravljanje uporabniških profilov
-- Avtorizacija in vloge (avtor, založnik, admin)
-- Upravljanje sej
-
-### Landing Page Service (Storitev za Landing Page)
-**Odgovornosti:**
-- Ustvarjanje in upravljanje landing page
-- Konfiguracijo dizajna in predlog
-- Povezava knjig z landing page
-- Objava in deaktivacija strani
-
-### Order Service (Storitev za Naročila)
-**Odgovornosti:**
-- Upravljanje prednaročil
-- Sledenje stanju naročil
-- Integracija s plačilnimi sistemi (se preveriti)
-- Generiranje računov
-
-### Notification Service (Storitev za Obvestila)
-**Odgovornosti:**
-- Pošiljanje emailov (potrditve, obvestila)
-- Push obvestila
-- Upravljanje predlog za obvestila
-- Asinhrona obdelava prek sporočilne vrste
-
-### Analytics Service (Storitev za Analitiko)
-**Odgovornosti:**
-- Sledenje obiskov landing page
-- Statistika konverzij (ogledi → naročila)
-- Analitika uporabniških dejanj
-- Generiranje poročil
-- število obiskov landing page
-- število klikov na "Prednaroči"
-- konverzijo (views → orders)
+### Implemented in documentation
+- End-to-end guides for each phase (`PHASE_1B` to `PHASE_1F`).
+- Architecture diagrams and completion reports.
+- Quick-start and development guides.
 
 ---
 
-## 3. Arhitektura Sistema
+## 2) Microservice architecture (what to understand)
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Frontend (React/Vue)                      │
-│                    Landing Pages + Admin Panel                   │
-└────────────────────────────┬────────────────────────────────────┘
-                             │ HTTPS/REST
-┌────────────────────────────┴────────────────────────────────────┐
-│                        API Gateway (Kong/Nginx)                  │
-│                    Authentication & Rate Limiting                │
-└─────┬──────┬──────┬──────┬──────┬──────────────────────────────┘
-      │      │      │      │      │
-      │      │      │      │      │     REST APIs
-┌─────▼──┐ ┌─▼────┐ ┌─▼──┐ ┌─▼──┐ ┌─▼──────┐
-│ Book   │ │ User │ │Land│ │Ord │ │Analytics│
-│Service │ │Serv  │ │Page│ │Serv│ │ Service │
-│        │ │ice   │ │Serv│ │ice │ │         │
-└───┬────┘ └──┬───┘ └─┬──┘ └─┬──┘ └────┬────┘
-    │         │       │      │         │
-    │ DB      │ DB    │ DB   │ DB      │ DB
-┌───▼────┐┌──▼───┐┌──▼──┐┌──▼──┐  ┌───▼────┐
-│Books DB││Users ││Pages││Orders│ │Analytics│
-│(Postgre││DB    ││DB   ││DB    │ │DB       │
-│SQL)    ││(Post)││(Mong││(Post)│ │(MongoDB)│
-└────────┘└──────┘└─────┘└──────┘ └─────────┘
-              │            │
-              └────────┬───┘
-              ┌────────▼──────────┐
-              │ Message Broker    │
-              │    (RabbitMQ)     │
-              └────────┬──────────┘
-                       │
-              ┌────────▼──────────┐
-              │  Notification     │
-              │    Service        │
-              └───────────────────┘
-```
+Your current implemented flow is:
 
-**Diagram**
- - Frontend je del uporabniskega vmesnika. Ne komunicira direktno s storitvijo, ampak s pomocjo https/rest
- - Api Gateway je vstopna tocka v sistem. Njegove naloge so: sprejem zahtev iz frontenda, preveri avtentikacijo, preusmeri zahtevo na mikrostoritev 
- - Mikrostoritev, vsaka je neodvisno in ima tocno doloceno odgovornost
- - DB : vsaka mikrostoritev ima svojo bazo podatkov, vsaka vpravlja svoje podakte
- - RabbitMQ omogoca asinhrono komunikacijo, storitev poslje dogodek in ga druge poslusaju
+`Client -> Book Service API -> Domain Service -> Repository -> PostgreSQL`
 
-### Ključne Arhitekturne Odločitve
-
-**Komunikacija:**
-- **REST API** za sinhrono komunikacijo med storitvami
-Komunikacija med froentnd in mikrostoritvijo 
-Komunikacija poteka preko http protokola, podatki so posredovani v json formatu 
-
-primer: frontend pošlje zahtevo GET /api/landing-pages/45 
-Landing page service vrne podatke o strani 
-{
-  "id": 45,
-  "bookId": 123,
-  "title": "New Fantasy Novel",
-  "description": "A new epic adventure"
-} 
-Nato frontend zahteva še podatke o knjigi GET /api/books/123
-Book service vrne podatke o knjigi 
-
-- **RabbitMQ** za asinhrono pošiljanje obvestil
-- za podatke ki ne potrebujejo odogovor takoj, se uporablja asinhrona komunikacija 
-primer: Uporabnik odda narocilo 
-Order service ustvari narocilo v bazi 
-Nato poslje dogodek v RabbitMQ order.placed
-Notification service poslusa dogodek in ko sprejme sporocilo poslje uporabniku email 
-Tako order service ne caka da se email poslje  
-
-- **Api gateway**
-- API Gateway je vstopna točka v sistem.
-Njegove naloge so:
-usmerjanje zahtev do mikrostoritev
-avtentikacija uporabnikov
-omejevanje zahtev (rate limiting)
-skrivanje notranje arhitekture sistema
-
-
-**Baze Podatkov:**
-- **PostgreSQL** za strukturirane podatke (knjige, uporabniki, naročila)
-Za strogo strukturirane podatke kot so Book Service, User Service in Order service 
-- **MongoDB** za fleksibilne dokumente (landing page konfiguracije, analitika)
-za manje strukturirane podatke, kao sto su analytics service in landing page service 
-
-**Uporabniški Vmesnik:**
-- **Frontend SPA** (Single Page Application) ločen od backend storitev
-- Komunicira prek API Gateway
-primer: 
-Avtor ustvari novo knjigo, 
-frontend poslje novo zahtevo post /api/books 
-Api gateway zahtevo preusmeri na Book Service 
-Book service shvari v DB 
-Sistem vrne odgovor in frontend prikaze ustvarjeno knjigo 
----
-
-## 4. Struktura Repozitorija
-
-```
-new-book-landing-system/
-├── README.md
-├── docs/
-│   ├── architecture.md
-│   ├── api-specification.md
-│   └── deployment.md
-├── services/
-│   ├── book-service/
-│   │   ├── src/
-│   │   ├── tests/
-│   │   ├── Dockerfile
-│   │   └── package.json
-│   ├── user-service/
-│   │   ├── src/
-│   │   ├── tests/
-│   │   ├── Dockerfile
-│   │   └── package.json
-│   ├── landing-page-service/
-│   │   ├── src/
-│   │   ├── tests/
-│   │   ├── Dockerfile
-│   │   └── package.json
-│   ├── order-service/
-│   │   ├── src/
-│   │   ├── tests/
-│   │   ├── Dockerfile
-│   │   └── package.json
-│   ├── notification-service/
-│   │   ├── src/
-│   │   ├── tests/
-│   │   ├── Dockerfile
-│   │   └── package.json
-│   └── analytics-service/
-│       ├── src/
-│       ├── tests/
-│       ├── Dockerfile
-│       └── package.json
-├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   └── services/
-│   ├── public/
-│   └── package.json
-├── api-gateway/
-│   ├── config/
-│   └── nginx.conf
-├── infrastructure/
-│   ├── docker-compose.yml
-│   ├── kubernetes/
-│   └── terraform/
-└── shared/
-    ├── models/
-    └── utils/
-```
+Core microservice principles already visible in this codebase:
+- **Single responsibility**: Book Service owns only book domain behavior.
+- **Layer isolation**: business logic is independent of HTTP and DB details.
+- **Contract-based design**: `IBookRepository` decouples domain from storage implementation.
+- **Independent deployment**: Dockerized service and CI pipeline.
+- **Independent data ownership**: Book Service has its own database schema.
 
 ---
 
-## 5. Komunikacija med Storitvami
+## 3) What you should learn next (roadmap)
 
-### REST API Komunikacija
+If you want to deeply understand microservices, learn in this order:
 
-**Book Service API:**
-```
-GET    /api/books              - Seznam knjig
-GET    /api/books/:id          - Podrobnosti knjige
-POST   /api/books              - Ustvari knjigo
-PUT    /api/books/:id          - Posodobi knjigo
-DELETE /api/books/:id          - Izbriši knjigo
-```
+1. **Layered/Clean Architecture basics**
+   - Why separate API, Domain, Infrastructure.
+   - Why domain should not depend on frameworks.
 
-**User Service API:**
-```
-POST   /api/auth/register      - Registracija
-POST   /api/auth/login         - Prijava
-GET    /api/users/profile      - Uporabniški profil
-PUT    /api/users/profile      - Posodobi profil
-```
+2. **HTTP API design**
+   - REST conventions, status codes, DTO separation, error contract.
 
-**Landing Page Service API:**
-```
-GET    /api/landing-pages      - Seznam landing pages
-GET    /api/landing-pages/:id  - Podrobnosti landing page
-POST   /api/landing-pages      - Ustvari landing page
-PUT    /api/landing-pages/:id  - Posodobi landing page
-POST   /api/landing-pages/:id/publish - Objavi landing page
-```
+3. **Domain modeling**
+   - Entities, state transitions, invariants, business rules.
 
-**Order Service API:**
-```
-POST   /api/orders             - Ustvari naročilo
-GET    /api/orders/:id         - Podrobnosti naročila
-GET    /api/orders/user/:userId - Naročila uporabnika
-```
+4. **Persistence boundaries**
+   - Repository pattern, EF Core mappings, migrations, data constraints.
 
-### Sporočilni Posrednik (Message Broker)
+5. **Testing pyramid**
+   - Unit vs repository vs integration tests and what each catches.
 
-**Eventi prek RabbitMQ:**
-- `book.created` - Nova knjiga ustvarjena
-- `order.placed` - Novo naročilo oddano
-- `order.confirmed` - Naročilo potrjeno
-- `user.registered` - Nov uporabnik registriran
+6. **Containerization and CI/CD**
+   - Docker multi-stage builds, compose orchestration, automated checks.
 
-**Notification Service** posluša te dogodke in pošilja ustrezna obvestila.
+7. **Distributed systems topics (next stage)**
+   - API gateway, service discovery, async messaging (RabbitMQ/Kafka), eventual consistency, observability.
 
 ---
 
-## 6. Implementacija Osnovnih Funkcionalnosti
+## 4) Recommended reading order in this repo
 
-### Pristop k Implementaciji
-
-1. **Poslovna Logika** - najprej implementiramo osnovne poslovne funkcije (domain layer)
-2. **API Endpoints** - nato dodamo REST API končne točke
-3. **Integracija s Podatkovno Bazo** - povezava z bazo podatkov
-4. **Komunikacija med Storitvami** - integracija storitev
-
-### Primer Strukture Storitve (Book Service)
-
-```
-book-service/
-├── src/
-│   ├── domain/              # Poslovna logika
-│   │   ├── book.entity.ts
-│   │   ├── book.repository.interface.ts
-│   │   └── book.service.ts
-│   ├── application/         # Uporabniški primeri
-│   │   ├── create-book.usecase.ts
-│   │   └── get-book.usecase.ts
-│   ├── infrastructure/      # Tehnična implementacija
-│   │   ├── database/
-│   │   │   └── book.repository.ts
-│   │   └── api/
-│   │       └── book.controller.ts
-│   └── main.ts
-└── tests/
-    ├── unit/
-    └── integration/
-```
+1. `services/book-service/QUICK_START.md`
+2. `services/book-service/DEVELOPMENT.md`
+3. `services/book-service/PHASE_1B_GUIDE.md`
+4. `services/book-service/PHASE_1C_GUIDE.md`
+5. `services/book-service/PHASE_1D_GUIDE.md`
+6. `services/book-service/PHASE_1E_GUIDE.md`
+7. `services/book-service/PHASE_1F_GUIDE.md`
+8. `ARCHITECTURE_DIAGRAM.md`
+9. `BOOK_SERVICE_COMPLETE.md`
+10. `PROJECT_COMPLETION_REPORT.md` and `DELIVERABLES.md`
 
 ---
 
-## 7. Testiranje
+## 5) Tree walkthrough: what each folder/file does
 
-### Enotski Testi (Unit Tests)
-- Testiranje poslovne logike brez odvisnosti
-- Uporaba mock objektov za externe odvisnosti
-- Pokritost vsaj 80% kode
+This section explains each meaningful file from your current tree.
 
-### Integracijski Testi
-- Testiranje API končnih točk
-- Testiranje povezave s podatkovno bazo
-- Testiranje komunikacije med storitvami
+> Note: `bin/` and `obj/` folders are build artifacts generated by .NET and can be ignored when learning architecture.
 
-### E2E Testi
-- Testiranje celotnih uporabniških scenarijev
-- Simulacija realnih uporabniških interakcij
+### Root level
 
-### Primer Testov
-```javascript
-// Unit test
-describe('BookService', () => {
-  it('should create a book with valid data', async () => {
-    const bookData = {
-      title: 'Test Book',
-      author: 'Test Author',
-      isbn: '978-3-16-148410-0'
-    };
-    const book = await bookService.createBook(bookData);
-    expect(book.title).toBe('Test Book');
-  });
-});
+- `README.md`
+  - Main project guide (this file).
 
-// Integration test
-describe('Book API', () => {
-  it('POST /api/books should create a new book', async () => {
-    const response = await request(app)
-      .post('/api/books')
-      .send({ title: 'Test Book', author: 'Author' });
-    expect(response.status).toBe(201);
-  });
-});
-```
+- `ARCHITECTURE_DIAGRAM.md`
+  - Full system and testing architecture diagrams (service boundaries, layers, infra, CI flow).
+
+- `BOOK_SERVICE_COMPLETE.md`
+  - Consolidated summary of all implemented phases and features.
+
+- `DELIVERABLES.md`
+  - Checklist-style overview of delivered requirements and artifacts.
+
+- `PROJECT_COMPLETION_REPORT.md`
+  - Final completion report with metrics, outcomes, and production-readiness view.
+
+- `.github/workflows/book-service.yml`
+  - Root CI pipeline triggered on `services/book-service/**` changes.
+  - Builds, runs tests, checks coverage pipeline steps, and builds Docker image.
 
 ---
 
-## 8. Uporabniški Vmesnik
+### `services/book-service/` (service root)
 
-### Frontend Aplikacija
-- **Framework:** React ali Vue.js
-- **Styling:** Tailwind CSS ali Material-UI
-- **Stanje:** Redux/Pinia
-- **HTTP Client:** Axios
+- `.gitignore`
+  - Ignores local/build/runtime artifacts.
 
-### Strani
+- `README.md`
+  - Service-scoped summary and quick orientation.
 
-**Javne Strani:**
-- Landing page za knjigo (dinamično generirana)
-- Seznam knjig
-- Stran za prednaročilo
+- `DEVELOPMENT.md`
+  - Deeper explanation of architecture and design decisions.
 
-**Admin Panel:**
-- Dashboard s statistiko
-- Upravljanje knjig
-- Upravljanje landing pages
-- Pregled naročil
+- `QUICK_START.md`
+  - Fast setup: run with Docker, test API, run tests.
 
-### Komunikacija
-Frontend komunicira **izključno** prek API Gateway, ki usmeri zahteve do ustreznih mikrostoritev.
+- `PHASE_1B_GUIDE.md`
+  - Domain layer deep dive.
+
+- `PHASE_1C_GUIDE.md`
+  - Infrastructure + database deep dive.
+
+- `PHASE_1D_GUIDE.md`
+  - API layer and endpoint behavior deep dive.
+
+- `PHASE_1E_GUIDE.md`
+  - Testing strategy and implementation details.
+
+- `PHASE_1F_GUIDE.md`
+  - DevOps/deployment/migrations/CI details.
+
+- `Dockerfile`
+  - Multi-stage .NET build/runtime container definition.
+  - Includes health check command and runtime config.
+
+- `docker-compose.yml`
+  - Orchestrates `api`, `postgres`, and `adminer` containers.
+  - Defines network, volume, startup dependencies and health checks.
+
+- `.github/workflows/` (inside service)
+  - Currently empty folder placeholder for possible service-local workflows.
 
 ---
 
-## 9. Navodila za Zagon
+### `services/book-service/src/BookService.API/` (HTTP/API layer)
 
-### Predpogoji
-- Docker & Docker Compose
-- Node.js 18+
-- PostgreSQL 14+
-- MongoDB 6+
-- RabbitMQ 3.11+
+- `BookService.API.csproj`
+  - API project configuration and package references:
+    `ASP.NET Core`, `Swagger`, `FluentValidation`, `Serilog`, `EF/Npgsql`.
 
-### Razvoj z Docker Compose
+- `Program.cs`
+  - Application entry point.
+  - Registers DI services, Swagger, CORS, validators, infrastructure.
+  - Configures middleware pipeline and database initialization at startup.
+
+- `appsettings.json`
+  - Base runtime config: logging levels, connection string, Serilog config.
+
+- `appsettings.Development.json`
+  - Development overrides for logging and local DB connection.
+
+- `Controllers/BooksController.cs`
+  - Main REST controller for books.
+  - Handles request mapping, calls domain service, maps entities to DTOs, returns HTTP status codes.
+  - Exposes endpoints for list/get/create/update/delete + publish/archive/discontinue + statistics.
+
+- `DTOs/BookDtos.cs`
+  - Request/response models exchanged through HTTP.
+  - Contains create/update request models, response models, and standardized error payload.
+
+- `Validators/BookValidators.cs`
+  - FluentValidation rules for incoming create/update requests.
+  - Enforces constraints like title/author length, ISBN format, price, URL validity.
+
+- `Middleware/GlobalExceptionMiddleware.cs`
+  - Global exception handler.
+  - Converts unhandled exceptions to consistent JSON error responses with proper status codes.
+
+---
+
+### `services/book-service/src/BookService.Domain/` (business layer)
+
+- `BookService.Domain.csproj`
+  - Domain project config (minimal dependencies by design).
+
+- `Entities/Book.cs`
+  - Core domain entity.
+  - Encapsulates book state and business operations (`Update`, `Publish`, `Archive`, `Discontinue`).
+  - Guards invariants via validation and controlled state transitions.
+
+- `Enums/BookStatus.cs`
+  - Enum lifecycle states: `Draft`, `Published`, `Archived`, `Discontinued`.
+
+- `Common/Result.cs`
+  - Result pattern for explicit success/failure without relying only on exceptions.
+  - Used by services to return data + error metadata.
+
+- `Interfaces/IBookRepository.cs`
+  - Repository contract defining required persistence operations.
+  - Keeps domain decoupled from EF Core/PostgreSQL implementation.
+
+- `Services/BookService.cs`
+  - Domain service with business use-cases.
+  - Orchestrates validation, uniqueness checks, state transitions, and repository interaction.
+
+---
+
+### `services/book-service/src/BookService.Infrastructure/` (technical/data layer)
+
+- `BookService.Infrastructure.csproj`
+  - Infrastructure project config and technical dependencies (`EF Core`, `Npgsql`, configuration libs).
+
+- `Data/BookServiceDbContext.cs`
+  - EF Core context and entity mapping.
+  - Defines table/column mappings, constraints, indexes, and save behavior.
+
+- `Data/DesignTimeDbContextFactory.cs`
+  - Design-time context creation for EF CLI commands (`dotnet ef ...`).
+  - Required for migrations when app host is not running.
+
+- `Repositories/BookRepository.cs`
+  - Concrete `IBookRepository` implementation.
+  - Executes CRUD/filter/count operations through EF Core.
+
+- `Extensions/InfrastructureServiceCollectionExtensions.cs`
+  - DI extension methods for registering infrastructure services.
+  - Includes helper for startup database initialization/migrations.
+
+---
+
+### `services/book-service/tests/` (test projects)
+
+#### `BookService.UnitTests/`
+- `BookService.UnitTests.csproj`
+  - Unit-test dependencies (`xUnit`, `Moq`, coverage collector).
+- `Services/BookServiceTests.cs`
+  - Tests domain service behavior in isolation using mocked repository dependencies.
+
+#### `BookService.RepositoryTests/`
+- `BookService.RepositoryTests.csproj`
+  - Repository-test dependencies, including `Testcontainers` for real PostgreSQL.
+- `Repositories/BookRepositoryTests.cs`
+  - Tests repository behavior against an actual DB container (persistence constraints, queries, CRUD).
+
+#### `BookService.IntegrationTests/`
+- `BookService.IntegrationTests.csproj`
+  - Integration test setup (`WebApplicationFactory`, HTTP test tooling).
+- `Endpoints/BooksControllerIntegrationTests.cs`
+  - End-to-end API tests through HTTP against hosted test application.
+
+---
+
+## 6) How to run and explore
+
+### Run with Docker
 
 ```bash
-# Klonirajte repozitorij
-git clone https://github.com/your-username/new-book-landing-system.git
-cd new-book-landing-system
-
-# Poženite vse storitve
-docker-compose up -d
-
-# Preverite status
-docker-compose ps
-
-# Ogled logov
-docker-compose logs -f [service-name]
-```
-
-### Ročni Zagon Posamezne Storitve
-
-```bash
-# Book Service
 cd services/book-service
-npm install
-npm run dev
-
-# User Service
-cd services/user-service
-npm install
-npm run dev
-
-# Frontend
-cd frontend
-npm install
-npm run dev
+docker-compose up --build
 ```
 
-### Dostop do Aplikacije
+Useful URLs:
+- API: `http://localhost:5001`
+- Swagger: `http://localhost:5001/swagger`
+- Adminer: `http://localhost:8080`
 
-- Frontend: http://localhost:3000
-- API Gateway: http://localhost:8080
-- Book Service: http://localhost:3001
-- User Service: http://localhost:3002
-- Landing Page Service: http://localhost:3003
-- Order Service: http://localhost:3004
-- Analytics Service: http://localhost:3005
-- Notification Service: http://localhost:3006
-
-### Produkcijski Zagon
+### Run tests
 
 ```bash
-# Build Docker images
-docker-compose -f docker-compose.prod.yml build
+cd services/book-service
+dotnet test
+```
 
-# Deploy
-docker-compose -f docker-compose.prod.yml up -d
+### Run service locally (without dockerized API)
+
+```bash
+cd services/book-service
+dotnet run --project src/BookService.API
 ```
 
 ---
 
-## Tehnologije
+## 7) How this evolves into a full microservices system
 
-- **Backend:** Node.js (Express/NestJS)
-- **Frontend:** React/Vue.js
-- **Baze:** PostgreSQL, MongoDB
-- **Message Broker:** RabbitMQ
-- **API Gateway:** Kong/Nginx
-- **Containerization:** Docker
-- **Orchestration:** Kubernetes (production)
-- **CI/CD:** GitHub Actions
-- **Monitoring:** Prometheus, Grafana
+After Book Service, your next implementation steps are typically:
 
----
-
-## Prispevanje
-
-1. Fork repozitorija
-2. Ustvarite feature branch (`git checkout -b feature/nova-funkcionalnost`)
-3. Commit spremembe (`git commit -m 'Dodaj novo funkcionalnost'`)
-4. Push na branch (`git push origin feature/nova-funkcionalnost`)
-5. Odprite Pull Request
+1. Build `User Service` (identity/profile).
+2. Build `Landing Page Service` (presentation + templates).
+3. Build `Order Service` (preorders + workflow).
+4. Add async events (`order.created`, `book.published`) via broker.
+5. Add `Notification Service` subscriber.
+6. Add `Analytics Service` event sink.
+7. Introduce API Gateway and centralized auth.
+8. Add observability (distributed tracing + metrics + dashboards).
 
 ---
 
-## Scenariji 
+## 8) Final learning advice
 
-1. Avtor ali zaloznik se prijavi v sistem
-2. Pritisne gumb za ustvarjanje nove knjige, "Create book"
-3. Izpolni ime, naslov, opis, avtor, cena, isbn
-4. Frontend poslje zahtevo POST /api/books
-5. API Gateway zahtevo preusmeri na Book Service.
-6. Book service preveri podatke in shrani jo v Book DB
-7. Sistem vrne odgovor frontendu 
-8. Frontend prikaze novo ustvarjeno knjigo 
+To truly understand microservices from this project, do this practical loop:
 
+1. Read one file (for example `BookService.cs`).
+2. Trace one request end-to-end (Swagger -> Controller -> Domain -> Repository -> DB).
+3. Find the matching test and run it.
+4. Change one business rule and update tests.
+5. Rebuild and rerun with Docker.
 
-## Scenarij 2 
-
-Avtor ustvari landing page 
-1. Avtor izbere obstojeco knjigo 
-2. Klikne gumb za ustvarjanje landing page-a, "Create landing page"
-3. Frontend poslje zahtevo POST /api/landing-pages
-4. API Gateway zahtevo preusmeri na Landing Page Service
-5. Landing page service shrani konfiguracijo strani in poveze bookID
-6. Avtor klikne "Publish"
-7. Sistem generira javni URL /landing/new-fantasy-novel
-
-
-## Scenarij 3 
-Bralec obisce stran 
-
-1. Bralec odrpe URL strani
-2. Frontend poslje get api/landing-pages/id
-3. Landing service vrne bookId in stran 
-4. Frontend poslje zahtevo get /api/books/id
-5. Book service vrne podatke o knjigi 
-6. Frontend prikaze stran
-
-
-## Scenarij 4 
-Bralec odda narocilo 
-1. Klikne gumb "Naroci"
-2. Izpolni ime, email in naslov 
-3. Frontend poslje post /api/orders
-4. Order service preveri ali knjiga obstaja in shrani narocilo v OrdersDB
-5. Order Service objavi event: order.placed v RabbitMQ
-6. Notification Service prejme event in pošlje email.
-
-## scenarij 5 
-Avtor pregleda statistiko 
-1. Avtor odpre dashboard 
-2. Frontend poslje  get /api/orders/book/id
-3. order service vrne stevilo narocil ali statuse narocil
-4. Frontednd prikaz osnovne statistike 
- 
-
-
+If you repeat this loop for each layer, you will understand both **code structure** and **microservice thinking** very quickly.

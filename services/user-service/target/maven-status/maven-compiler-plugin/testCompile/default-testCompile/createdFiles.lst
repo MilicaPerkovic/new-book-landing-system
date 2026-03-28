@@ -1,0 +1,7 @@
+si/um/feri/userservice/infrastructure/security/BcryptPasswordHasherTest.class
+si/um/feri/userservice/application/service/UserApplicationServiceTest.class
+si/um/feri/userservice/application/service/AuthenticationServiceTest.class
+si/um/feri/userservice/domain/repository/UserRepositoryTest.class
+si/um/feri/userservice/grpc/service/UserGrpcServiceTest.class
+si/um/feri/userservice/infrastructure/security/SimpleTokenServiceTest.class
+si/um/feri/userservice/UserServiceApplicationTests.class
