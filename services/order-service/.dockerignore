@@ -1,5 +1,29 @@
-*
-!target/*-runner
-!target/*-runner.jar
-!target/lib/*
-!target/quarkus-app/*
+# Git
+.git
+.gitignore
+.github
+
+# Build artifacts (but allow src and pom.xml)
+.mvn/
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Development
+.env
+.env.local
+
+# Documentation
+docs/
+*.md
