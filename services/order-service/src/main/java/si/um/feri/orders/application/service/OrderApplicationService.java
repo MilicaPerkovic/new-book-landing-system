@@ -14,6 +14,8 @@ import si.um.feri.orders.domain.event.OrderConfirmed;
 import si.um.feri.orders.domain.event.OrderCreated;
 import si.um.feri.orders.domain.event.OrderFulfilled;
 import si.um.feri.orders.infrastructure.event.OrderEventPublisher;
+import io.quarkus.hibernate.reactive.panache.common.WithSession;
+import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -59,6 +61,7 @@ public class OrderApplicationService {
      * @return Created order response
      * @throws OrderValidationException if input fails validation
      */
+    @WithTransaction
     public Uni<OrderResponse> createOrder(CreateOrderRequest request) {
         // Validate input
         validateCreateOrderRequest(request);
@@ -94,6 +97,7 @@ public class OrderApplicationService {
      * @return Order response if found
      * @throws OrderNotFoundException if order doesn't exist
      */
+    @WithSession
     public Uni<OrderResponse> getOrderById(UUID orderId) {
         Objects.requireNonNull(orderId, "orderId must be provided");
 
@@ -112,6 +116,7 @@ public class OrderApplicationService {
      * @throws OrderNotFoundException if order doesn't exist
      * @throws InvalidOrderStateTransitionException if order is not PENDING
      */
+    @WithTransaction
     public Uni<OrderResponse> confirmOrder(UUID orderId) {
         Objects.requireNonNull(orderId, "orderId must be provided");
 
@@ -152,6 +157,7 @@ public class OrderApplicationService {
      * @throws OrderNotFoundException if order doesn't exist
      * @throws InvalidOrderStateTransitionException if order is already terminal
      */
+    @WithTransaction
     public Uni<OrderResponse> cancelOrder(UUID orderId) {
         Objects.requireNonNull(orderId, "orderId must be provided");
 
@@ -191,6 +197,7 @@ public class OrderApplicationService {
      * @throws OrderNotFoundException if order doesn't exist
      * @throws InvalidOrderStateTransitionException if order is not CONFIRMED
      */
+    @WithTransaction
     public Uni<OrderResponse> fulfillOrder(UUID orderId) {
         Objects.requireNonNull(orderId, "orderId must be provided");
 
