@@ -21,10 +21,10 @@ services:
       - order-network
 
   artemis:
-    image: apache/activemq-artemis:latest-jre
+    image: apache/activemq-artemis:latest-alpine
     container_name: order-service-artemis
     environment:
-      ARTEMIS_USERNAME: artemis
+      ARTEMIS_USER: artemis
       ARTEMIS_PASSWORD: artemis
     ports:
       - "61616:61616"
