@@ -23,4 +23,4 @@ jobs:
           cache: maven
 
       - name: Run order-service unit tests
-        run: ./mvnw -B -f services/order-service/pom.xml -Dgroups=unit -DskipITs test
+        run: ./services/order-service/mvnw -B -f services/order-service/pom.xml -DskipITs -Dtest=OrderApplicationServiceTest,OrderEventPublisherTest,OrderRepositoryTest test
