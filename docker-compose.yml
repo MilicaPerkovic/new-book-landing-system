@@ -86,10 +86,97 @@ services:
     networks:
       - order-network
 
+  # Web API Gateway (Node.js)
+  api-gateway-web:
+    build:
+      context: ./services/api-gateway-web
+      dockerfile: Dockerfile
+    container_name: api-gateway-web-app
+    ports:
+      - "4000:4000"
+    environment:
+      USER_SERVICE_URL: user-service:9090
+      BOOK_SERVICE_URL: http://book-service:5000
+      ORDER_SERVICE_URL: http://order-service:8080
+    depends_on:
+      - user-service
+      - book-service
+      - order-service
+    networks:
+      - order-network
+
+  # Mobile API Gateway (Python)
+  api-gateway-mobile:
+    build:
+      context: ./services/api-gateway-mobile
+      dockerfile: Dockerfile
+    container_name: api-gateway-mobile-app
+    ports:
+      - "5005:5005"
+    environment:
+      USER_SERVICE_URL: user-service:9090
+      BOOK_SERVICE_URL: http://book-service:5000
+      ORDER_SERVICE_URL: http://order-service:8080
+    depends_on:
+      - user-service
+      - book-service
+      - order-service
+    networks:
+      - order-network
+
+  # User Service (Java gRPC)
+  user-service:
+    build:
+      context: ./services/user-service
+      dockerfile: Dockerfile
+    container_name: user-service-app
+    ports:
+      - "9090:9090"
+    networks:
+      - order-network
+
+  # Book Service (C# REST)
+  book-service:
+    build:
+      context: ./services/book-service
+      dockerfile: Dockerfile
+    container_name: book-service-app
+    ports:
+      - "5000:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Host=book-postgres;Port=5432;Database=books_db;Username=postgres;Password=postgres
+    depends_on:
+      - book-postgres
+    networks:
+      - order-network
+
+  # PostgreSQL for Book Service
+  book-postgres:
+    image: postgres:15-alpine
+    container_name: book-service-db
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: books_db
+    volumes:
+      - book-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - order-network
+
 volumes:
   postgres-data:
     driver: local
   artemis-data:
+    driver: local
+  book-postgres-data:
     driver: local
 
 networks:
