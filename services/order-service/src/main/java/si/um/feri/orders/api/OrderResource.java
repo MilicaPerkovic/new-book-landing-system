@@ -49,12 +49,13 @@ public class OrderResource {
      * - price is positive
      * 
      * @param request Order creation request
+     * @param idempotencyKey Optional header Idempotency-Key
      * @return 202 Accepted with OrderResponse
      * @throws OrderValidationException (400) if input invalid
      */
     @POST
-    public Uni<Response> createOrder(CreateOrderRequest request) {
-        return orderApplicationService.createOrder(request)
+    public Uni<Response> createOrder(CreateOrderRequest request, @HeaderParam("Idempotency-Key") String idempotencyKey) {
+        return orderApplicationService.createOrder(request, idempotencyKey)
             .map(dto -> Response.status(202).entity(dto).build());
     }
 
@@ -70,6 +71,30 @@ public class OrderResource {
     public Uni<Response> getOrder(@PathParam("orderId") UUID orderId) {
         return orderApplicationService.getOrderById(orderId)
             .map(dto -> Response.ok(dto).build());
+    }
+
+    /**
+     * Get all orders for a specific user.
+     * 
+     * @param userId User identifier
+     * @return 200 OK with list of OrderResponse
+     */
+    @GET
+    @Path("user/{userId}")
+    public Uni<Response> getOrdersByUser(@PathParam("userId") UUID userId) {
+        return orderApplicationService.getOrdersByUserId(userId)
+            .map(orders -> Response.ok(orders).build());
+    }
+
+    /**
+     * Get all orders in the system (admin endpoint).
+     * 
+     * @return 200 OK with list of all OrderResponse
+     */
+    @GET
+    public Uni<Response> getAllOrders() {
+        return orderApplicationService.getAllOrders()
+            .map(orders -> Response.ok(orders).build());
     }
 
     /**

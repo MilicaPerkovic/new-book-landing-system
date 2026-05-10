@@ -49,8 +49,14 @@ public class OrderApplicationService {
     @Inject
     OrderEventPublisher eventPublisher;
 
+    @Inject
+    si.um.feri.orders.domain.IdempotencyKeyRepository idempotencyKeyRepository;
+
+    @Inject
+    com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+
     /**
-     * Create a new preorder for a book.
+     * Create a new preorder for a book with Idempotency Support.
      * 
      * Business Rules:
      * - All fields are required
@@ -58,13 +64,43 @@ public class OrderApplicationService {
      * - Price must be positive
      * 
      * @param request Contains bookId, userId, quantity, price
+     * @param idempotencyKey Optional key for idempotency
      * @return Created order response
      * @throws OrderValidationException if input fails validation
      */
     @WithTransaction
-    public Uni<OrderResponse> createOrder(CreateOrderRequest request) {
+    public Uni<OrderResponse> createOrder(CreateOrderRequest request, String idempotencyKey) {
         // Validate input
         validateCreateOrderRequest(request);
+
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            return doCreateOrder(request);
+        }
+
+        return idempotencyKeyRepository.findById(idempotencyKey)
+            .onItem().transformToUni(existingKey -> {
+                if (existingKey != null) {
+                    try {
+                        OrderResponse cachedResponse = objectMapper.readValue(existingKey.responseBody, OrderResponse.class);
+                        return Uni.createFrom().item(cachedResponse);
+                    } catch (Exception e) {
+                        return Uni.createFrom().failure(e);
+                    }
+                } else {
+                    return doCreateOrder(request).onItem().call(response -> {
+                        try {
+                            String json = objectMapper.writeValueAsString(response);
+                            si.um.feri.orders.domain.IdempotencyKeyEntity newKey = new si.um.feri.orders.domain.IdempotencyKeyEntity(idempotencyKey, json, 202);
+                            return idempotencyKeyRepository.persist(newKey);
+                        } catch (Exception e) {
+                            return Uni.createFrom().failure(e);
+                        }
+                    });
+                }
+            });
+    }
+
+    private Uni<OrderResponse> doCreateOrder(CreateOrderRequest request) {
 
         // Create domain entity (factory enforces invariants)
         OrderEntity order = OrderEntity.create(
@@ -104,6 +140,36 @@ public class OrderApplicationService {
         return orderRepository.findById(orderId)
             .onItem().ifNull().failWith(() -> new OrderNotFoundException(orderId))
             .map(orderMapper::toDtoResponse);
+    }
+
+    /**
+     * Retrieve all orders for a specific user.
+     * 
+     * @param userId User identifier
+     * @return List of OrderResponse for this user
+     */
+    @WithSession
+    public Uni<java.util.List<OrderResponse>> getOrdersByUserId(UUID userId) {
+        Objects.requireNonNull(userId, "userId must be provided");
+
+        return orderRepository.find("userId", userId)
+            .list()
+            .map(orders -> orders.stream()
+                .map(orderMapper::toDtoResponse)
+                .toList());
+    }
+
+    /**
+     * Retrieve all orders in the system.
+     * 
+     * @return List of all OrderResponse objects
+     */
+    @WithSession
+    public Uni<java.util.List<OrderResponse>> getAllOrders() {
+        return orderRepository.listAll()
+            .map(orders -> orders.stream()
+                .map(orderMapper::toDtoResponse)
+                .toList());
     }
 
     /**

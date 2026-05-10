@@ -67,7 +67,7 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
 
             // Call application service (reactive - must block for gRPC)
             var appResponse = applicationService
-                .createOrder(appRequest)
+                .createOrder(appRequest, null)
                 .await()
                 .indefinitely();
 

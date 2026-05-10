@@ -1,70 +1,320 @@
-# order-service
+# Order Service Quick Start
 
-Reactive Quarkus 3 microservice that owns the preorder/order lifecycle for the Book Landing System. It persists orders in PostgreSQL, will expose reactive REST endpoints, and emits order-domain events over ActiveMQ Artemis.
+Order Service is a Quarkus microservice for order lifecycle management (create, confirm, cancel, fulfill), backed by PostgreSQL and ActiveMQ Artemis.
 
-## Current status (Part 1)
-- Order aggregate (`OrderEntity`) plus lifecycle enum are implemented with optimistic locking and timestamp management.
-- Flyway migration `V1__create_orders_table.sql` provisions schema `orders` with indexes required for future dashboards.
-- Testcontainers-backed repository spec (`OrderRepositoryTest`) persists and reloads an order against PostgreSQL 15 to prove the reactive persistence stack works end-to-end.
+## Prerequisites
 
-## Database configuration
-| Property | Default | Description |
-| --- | --- | --- |
-| `ORDERS_DB_HOST` | `localhost` | PostgreSQL host used by dev/test profiles |
-| `ORDERS_DB_PORT` | `5440` | Host port mapped to the container/internal 5432 |
-| `ORDERS_DB_DATABASE` | `orders` | Database/schema used by the service |
-| `ORDERS_DB_USERNAME` | `orders_dev` | Login passed to both JDBC + reactive clients |
-| `ORDERS_DB_PASSWORD` | `orders_dev` | Password counterpart |
+- Docker + Docker Compose
+- Java 21
+- Maven Wrapper (`./mvnw`) from this repository
 
-Startup automatically runs Flyway migrations (`quarkus.flyway.migrate-at-start=true`). Schema defaults to `orders`, so make sure the database user can create schemas on first boot.
+## Quick Start (Docker)
 
-## Running the application in dev mode
+Run from project root (`new-book-landing-system`):
 
-1. Provision PostgreSQL (example):
-   ```bash
-   docker run --rm -p 5440:5432 \
-     -e POSTGRES_DB=orders \
-     -e POSTGRES_USER=orders_dev \
-     -e POSTGRES_PASSWORD=orders_dev \
-     postgres:15.6-alpine
-   ```
-2. From the monorepo root execute:
-   ```bash
-   ./mvnw -pl services/order-service quarkus:dev
-   ```
-
-The Quarkus Dev UI will be exposed at http://localhost:8080/q/dev/.
-
-## Testing
-
-`OrderRepositoryTest` boots PostgreSQL 15 via Testcontainers; no manual DB setup is needed. Run:
+1. Build the service jar (required for current Dockerfile):
 
 ```bash
-./mvnw test -pl services/order-service -am
+./services/order-service/mvnw -f services/order-service/pom.xml -DskipTests package -Dquarkus.package.type=uber-jar
 ```
 
-## Packaging and running the application
+2. Build and start services:
 
 ```bash
-./mvnw package -pl services/order-service -am
-java -jar services/order-service/target/quarkus-app/quarkus-run.jar
+docker compose build order-service
+docker compose up -d
 ```
 
-To build an _über-jar_:
+3. Verify service health:
 
 ```bash
-./mvnw package -pl services/order-service -am -Dquarkus.package.jar.type=uber-jar
-java -jar services/order-service/target/order-service-1.0.0-SNAPSHOT-runner.jar
+curl http://localhost:8080/q/health
 ```
 
-## Native executable (optional)
+Expected response contains:
 
-```bash
-./mvnw package -pl services/order-service -am -Dnative
+```json
+{
+   "status": "UP"
+}
 ```
 
-Or rely on containerized native builds:
+## First API Call
+
+Create one order:
 
 ```bash
-./mvnw package -pl services/order-service -am -Dnative -Dquarkus.native.container-build=true
+curl -X POST http://localhost:8080/api/orders \
+   -H "Content-Type: application/json" \
+   -d '{
+      "bookId": "550e8400-e29b-41d4-a716-446655440000",
+      "userId": "660e8400-e29b-41d4-a716-446655440000",
+      "quantity": 2,
+      "price": 24.99
+   }'
+```
+
+## API Calls (Test Every Function)
+
+Use these calls to verify each endpoint.
+
+Important:
+- If you use a variable, write `$ORDER_ID`.
+- If you paste a literal UUID, do NOT put `$` before it.
+
+### 1) Create order
+
+```bash
+CREATE_RESPONSE=$(curl -sS -X POST http://localhost:8080/api/orders \
+   -H "Content-Type: application/json" \
+   -d '{
+      "bookId": "550e8400-e29b-41d4-a716-446655440000",
+      "userId": "660e8400-e29b-41d4-a716-446655440000",
+      "quantity": 2,
+      "price": 24.99
+   }')
+
+echo "$CREATE_RESPONSE"
+```
+
+### 2) Extract order id
+
+If you have jq:
+
+```bash
+ORDER_ID=$(echo "$CREATE_RESPONSE" | jq -r '.id')
+echo "$ORDER_ID"
+```
+
+Without jq, copy the id manually from CREATE_RESPONSE and set it:
+
+```bash
+ORDER_ID="paste-your-order-id-here"
+echo "$ORDER_ID"
+```
+
+Example literal UUID style (no `$`):
+
+```bash
+curl -sS http://localhost:8080/api/orders/your-order-id-here
+```
+
+### 3) Get order by id
+
+```bash
+curl -sS http://localhost:8080/api/orders/$ORDER_ID
+```
+
+Or with a pasted UUID (no `$`):
+
+```bash
+curl -sS http://localhost:8080/api/orders/your-order-id-here
+```
+
+### 4) Confirm order
+
+```bash
+curl -sS -X POST http://localhost:8080/api/orders/$ORDER_ID/confirm
+```
+
+Or with a pasted UUID (no `$`):
+
+```bash
+curl -sS -X POST http://localhost:8080/api/orders/your-order-id-here/confirm
+```
+
+### 5) Fulfill order (works after confirm)
+
+```bash
+curl -sS -X POST http://localhost:8080/api/orders/$ORDER_ID/fulfill
+```
+
+Or with a pasted UUID (no `$`):
+
+```bash
+curl -sS -X POST http://localhost:8080/api/orders/your-order-id-here/fulfill
+```
+
+### 6) Create second order for cancel test
+
+```bash
+CANCEL_RESPONSE=$(curl -sS -X POST http://localhost:8080/api/orders \
+   -H "Content-Type: application/json" \
+   -d '{
+      "bookId": "550e8400-e29b-41d4-a716-446655440001",
+      "userId": "660e8400-e29b-41d4-a716-446655440000",
+      "quantity": 1,
+      "price": 19.99
+   }')
+
+echo "$CANCEL_RESPONSE"
+```
+
+```bash
+CANCEL_ORDER_ID=$(echo "$CANCEL_RESPONSE" | jq -r '.id')
+echo "$CANCEL_ORDER_ID"
+```
+
+If you do not use jq:
+
+```bash
+CANCEL_ORDER_ID="paste-second-order-id-here"
+echo "$CANCEL_ORDER_ID"
+```
+
+### 7) Cancel order
+
+```bash
+curl -sS -X POST http://localhost:8080/api/orders/$CANCEL_ORDER_ID/cancel
+```
+
+Or with a pasted UUID (no `$`):
+
+```bash
+curl -sS -X POST http://localhost:8080/api/orders/your-second-order-id-here/cancel
+```
+
+### 8) Check invalid/not found case
+
+```bash
+curl -sS http://localhost:8080/api/orders/00000000-0000-0000-0000-000000000000
+```
+
+### 9) Health check
+
+```bash
+curl -sS http://localhost:8080/q/health
+```
+
+## Swagger Checks
+
+### Open Swagger UI in browser
+
+```bash
+open http://localhost:8080/q/swagger-ui/
+```
+
+### Open OpenAPI JSON
+
+```bash
+curl -sS http://localhost:8080/q/openapi | head -n 40
+```
+
+### What to verify in Swagger
+
+- POST /api/orders
+- GET /api/orders/{orderId}
+- POST /api/orders/{orderId}/confirm
+- POST /api/orders/{orderId}/cancel
+- POST /api/orders/{orderId}/fulfill
+
+Expected state rules:
+- confirm works only for PENDING
+- fulfill works only for CONFIRMED
+- cancel works only for non-terminal orders (not CANCELLED/FULFILLED)
+
+### Swagger primeri (Try it out)
+
+Do not reuse one hardcoded UUID for everything.
+Create a fresh order first, then use that returned id.
+
+POST /api/orders body example:
+
+```json
+{
+   "bookId": "550e8400-e29b-41d4-a716-446655440000",
+   "userId": "660e8400-e29b-41d4-a716-446655440000",
+   "quantity": 2,
+   "price": 24.99
+}
+```
+
+Step 1: in Swagger run POST /api/orders and copy id from response.
+
+Step 2: run GET /api/orders/{orderId}
+
+- orderId: id from Step 1
+
+Step 3: run POST /api/orders/{orderId}/confirm
+
+- orderId: same id from Step 1 (must still be PENDING)
+
+Step 4: run POST /api/orders/{orderId}/fulfill
+
+- orderId: same id after Step 3 (now CONFIRMED)
+
+Step 5 (cancel test): create another fresh order with POST /api/orders.
+
+Step 6: run POST /api/orders/{orderId}/cancel
+
+- orderId: id from Step 5
+
+If Swagger returns 409 INVALID_STATE_TRANSITION, the order is in the wrong state for that action.
+
+## Useful URLs
+
+- API base: `http://localhost:8080`
+- Health: `http://localhost:8080/q/health`
+- Swagger UI: `http://localhost:8080/q/swagger-ui/`
+- Artemis console: `http://localhost:8161`
+- pgAdmin: `http://localhost:5050`
+
+## Run Tests
+
+From project root:
+
+```bash
+./services/order-service/mvnw -f services/order-service/pom.xml test
+```
+
+## Stop / Reset
+
+Stop services:
+
+```bash
+docker compose down
+```
+
+Full reset (containers + volumes):
+
+```bash
+docker compose down -v
+```
+
+## Local Dev Mode (without Docker for app)
+
+1. Start only infrastructure:
+
+```bash
+docker compose up -d postgresql artemis
+```
+
+2. Run service in dev mode:
+
+```bash
+./services/order-service/mvnw -f services/order-service/pom.xml quarkus:dev
+```
+
+## Swagger UI Troubleshooting
+
+If you get `Resource not found` on Swagger UI:
+
+1. Use the URL with trailing slash:
+
+```bash
+http://localhost:8080/q/swagger-ui/
+```
+
+2. Ensure service is healthy:
+
+```bash
+curl http://localhost:8080/q/health
+```
+
+3. Rebuild and restart if you changed configuration:
+
+```bash
+./services/order-service/mvnw -f services/order-service/pom.xml -DskipTests package -Dquarkus.package.type=uber-jar
+docker compose build order-service
+docker compose up -d order-service
 ```
